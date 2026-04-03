@@ -1,0 +1,29 @@
+[package]
+name = "fluss-gateway"
+version = "0.1.0"
+edition = "2021"
+description = "REST API Gateway for Apache Fluss"
+
+[dependencies]
+fluss = { path = "../fluss-rust/crates/fluss", package = "fluss-rs" }
+
+axum = { version = "0.8", features = ["ws"] }
+tower = "0.5"
+tower-http = { version = "0.6", features = ["cors", "trace"] }
+tokio = { version = "1", features = ["full"] }
+
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+arrow = "57"
+arrow-schema = "57"
+
+thiserror = "1"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+clap = { version = "4", features = ["derive"] }
+anyhow = "1"
+ordered-float = "5"
+
+[dev-dependencies]
+reqwest = { version = "0.12", features = ["json"] }
