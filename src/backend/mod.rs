@@ -14,8 +14,24 @@ pub struct FlussBackend {
 
 impl FlussBackend {
     pub async fn new(coordinator_addr: &str) -> Result<Self, GatewayError> {
+        Self::with_auth(coordinator_addr, "", "").await
+    }
+
+    pub async fn with_auth(
+        coordinator_addr: &str,
+        username: &str,
+        password: &str,
+    ) -> Result<Self, GatewayError> {
         let mut config = Config::default();
         config.bootstrap_servers = coordinator_addr.to_string();
+
+        if !username.is_empty() && !password.is_empty() {
+            config.security_protocol = "sasl".to_string();
+            config.security_sasl_mechanism = "PLAIN".to_string();
+            config.security_sasl_username = username.to_string();
+            config.security_sasl_password = password.to_string();
+        }
+
         let conn = FlussConnection::new(config)
             .await
             .map_err(|e| GatewayError::ConnectionFailed(e.to_string()))?;

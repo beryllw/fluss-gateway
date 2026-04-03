@@ -99,20 +99,25 @@ pub async fn prefix_scan(
     Err(GatewayError::Internal("prefix scan not yet implemented".into()))
 }
 
-// === Batch Lookup (TODO) ===
+// === Batch Lookup ===
 
 #[derive(Deserialize)]
 pub(crate) struct BatchLookupRequest {
-    #[allow(dead_code)]
     keys: Vec<HashMap<String, String>>,
 }
 
 pub async fn batch_lookup(
-    Path((_db, _table)): Path<(String, String)>,
-    State(_backend): State<Arc<FlussBackend>>,
-    Json(_req): Json<BatchLookupRequest>,
+    Path((db, table)): Path<(String, String)>,
+    State(backend): State<Arc<FlussBackend>>,
+    Json(req): Json<BatchLookupRequest>,
 ) -> Result<Json<Vec<serde_json::Value>>, GatewayError> {
-    Err(GatewayError::Internal("batch lookup not yet implemented".into()))
+    let mut results = Vec::new();
+    for key in &req.keys {
+        let lookup_params = LookupParams::new(key.clone());
+        let rows = backend.lookup(&db, &table, &lookup_params).await?;
+        results.extend(rows);
+    }
+    Ok(Json(results))
 }
 
 // === Log Scan ===

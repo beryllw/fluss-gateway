@@ -20,6 +20,14 @@ struct Args {
     /// Fluss coordinator address (e.g. localhost:9123)
     #[arg(long, default_value = "localhost:9123")]
     fluss_coordinator: String,
+
+    /// SASL username for Fluss authentication
+    #[arg(long, default_value = "")]
+    sasl_username: String,
+
+    /// SASL password for Fluss authentication
+    #[arg(long, default_value = "")]
+    sasl_password: String,
 }
 
 #[tokio::main]
@@ -40,7 +48,11 @@ async fn main() -> anyhow::Result<()> {
         "starting flus-gateway"
     );
 
-    let server = GatewayServer::new(&args.fluss_coordinator).await?;
+    let server = if !args.sasl_username.is_empty() {
+        GatewayServer::new_with_auth(&args.fluss_coordinator, &args.sasl_username, &args.sasl_password).await?
+    } else {
+        GatewayServer::new(&args.fluss_coordinator).await?
+    };
     server.run(&addr).await?;
 
     Ok(())

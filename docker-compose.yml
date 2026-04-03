@@ -1,0 +1,26 @@
+# Docker Compose for Fluss Gateway development environment
+#
+# Usage:
+#   docker compose up -d          # Start all services
+#   docker compose logs -f        # View logs
+#   docker compose down           # Stop all services
+#
+# The gateway connects to Fluss coordinator at localhost:9123.
+# Update FLUSS_COORDINATOR env var if your coordinator runs elsewhere.
+
+services:
+  gateway:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8080:8080"
+    environment:
+      - RUST_LOG=fluss_gateway=info
+    command:
+      - --host=0.0.0.0
+      - --port=8080
+      - --fluss-coordinator=host.docker.internal:9123
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped
