@@ -1,8 +1,7 @@
 use std::collections::HashMap;
-use std::sync::Arc;
 
 use axum::{
-    extract::{Path, Query, State},
+    extract::{Extension, Path, Query, State},
     http::StatusCode,
     response::IntoResponse,
     Json,
@@ -10,10 +9,26 @@ use axum::{
 use fluss::row::GenericRow;
 use serde::{Deserialize, Serialize};
 
-use crate::backend::FlussBackend;
+use crate::config::AuthType;
+use crate::server::auth::BasicAuthCredentials;
+use crate::server::AppState;
 use crate::types::{
     GatewayError, LookupParams, ProduceRequest, ScanParams, WriteResult, json_to_datum,
 };
+
+/// Extract credentials from the request based on auth mode.
+fn extract_creds(
+    auth_type: &AuthType,
+    ext: Option<Extension<BasicAuthCredentials>>,
+) -> Result<Option<BasicAuthCredentials>, GatewayError> {
+    match auth_type {
+        AuthType::None => Ok(None),
+        AuthType::Passthrough => {
+            let ext = ext.ok_or_else(|| GatewayError::Unauthorized("authentication required".into()))?;
+            Ok(Some(ext.0))
+        }
+    }
+}
 
 // === Health ===
 
@@ -24,25 +39,31 @@ pub async fn health() -> impl IntoResponse {
 // === Metadata ===
 
 pub async fn list_databases(
-    State(backend): State<Arc<FlussBackend>>,
+    State(state): State<AppState>,
+    ext: Option<Extension<BasicAuthCredentials>>,
 ) -> Result<Json<Vec<String>>, GatewayError> {
-    let dbs = backend.list_databases().await?;
+    let creds = extract_creds(&state.auth_type, ext)?;
+    let dbs = state.backend.list_databases(creds.as_ref()).await?;
     Ok(Json(dbs))
 }
 
 pub async fn list_tables(
     Path(db): Path<String>,
-    State(backend): State<Arc<FlussBackend>>,
+    State(state): State<AppState>,
+    ext: Option<Extension<BasicAuthCredentials>>,
 ) -> Result<Json<Vec<String>>, GatewayError> {
-    let tables = backend.list_tables(&db).await?;
+    let creds = extract_creds(&state.auth_type, ext)?;
+    let tables = state.backend.list_tables(&db, creds.as_ref()).await?;
     Ok(Json(tables))
 }
 
 pub async fn table_info(
     Path((db, table)): Path<(String, String)>,
-    State(backend): State<Arc<FlussBackend>>,
+    State(state): State<AppState>,
+    ext: Option<Extension<BasicAuthCredentials>>,
 ) -> Result<Json<TableInfoResponse>, GatewayError> {
-    let info = backend.get_table_info(&db, &table).await?;
+    let creds = extract_creds(&state.auth_type, ext)?;
+    let info = state.backend.get_table_info(&db, &table, creds.as_ref()).await?;
     let schema = &info.schema;
     let columns: Vec<ColumnInfo> = schema
         .columns()
@@ -83,10 +104,15 @@ pub struct ColumnInfo {
 pub async fn lookup(
     Path((db, table)): Path<(String, String)>,
     Query(params): Query<HashMap<String, String>>,
-    State(backend): State<Arc<FlussBackend>>,
+    State(state): State<AppState>,
+    ext: Option<Extension<BasicAuthCredentials>>,
 ) -> Result<Json<Vec<serde_json::Value>>, GatewayError> {
+    let creds = extract_creds(&state.auth_type, ext)?;
     let lookup_params = LookupParams::new(params);
-    let rows = backend.lookup(&db, &table, &lookup_params).await?;
+    let rows = state
+        .backend
+        .lookup(&db, &table, &lookup_params, creds.as_ref())
+        .await?;
     Ok(Json(rows))
 }
 
@@ -108,13 +134,18 @@ pub(crate) struct BatchLookupRequest {
 
 pub async fn batch_lookup(
     Path((db, table)): Path<(String, String)>,
-    State(backend): State<Arc<FlussBackend>>,
+    State(state): State<AppState>,
+    ext: Option<Extension<BasicAuthCredentials>>,
     Json(req): Json<BatchLookupRequest>,
 ) -> Result<Json<Vec<serde_json::Value>>, GatewayError> {
+    let creds = extract_creds(&state.auth_type, ext)?;
     let mut results = Vec::new();
     for key in &req.keys {
         let lookup_params = LookupParams::new(key.clone());
-        let rows = backend.lookup(&db, &table, &lookup_params).await?;
+        let rows = state
+            .backend
+            .lookup(&db, &table, &lookup_params, creds.as_ref())
+            .await?;
         results.extend(rows);
     }
     Ok(Json(results))
@@ -124,10 +155,12 @@ pub async fn batch_lookup(
 
 pub async fn scan(
     Path((db, table)): Path<(String, String)>,
-    State(backend): State<Arc<FlussBackend>>,
+    State(state): State<AppState>,
+    ext: Option<Extension<BasicAuthCredentials>>,
     Json(params): Json<ScanParams>,
 ) -> Result<Json<Vec<serde_json::Value>>, GatewayError> {
-    let rows = backend.scan(&db, &table, &params).await?;
+    let creds = extract_creds(&state.auth_type, ext)?;
+    let rows = state.backend.scan(&db, &table, &params, creds.as_ref()).await?;
     Ok(Json(rows))
 }
 
@@ -135,10 +168,15 @@ pub async fn scan(
 
 pub async fn produce(
     Path((db, table)): Path<(String, String)>,
-    State(backend): State<Arc<FlussBackend>>,
+    State(state): State<AppState>,
+    ext: Option<Extension<BasicAuthCredentials>>,
     Json(req): Json<ProduceRequest>,
 ) -> Result<Json<WriteResult>, GatewayError> {
-    let table_info = backend.get_table_info(&db, &table).await?;
+    let creds = extract_creds(&state.auth_type, ext)?;
+    let table_info = state
+        .backend
+        .get_table_info(&db, &table, creds.as_ref())
+        .await?;
     let schema = &table_info.schema;
     let columns = schema.columns();
     let field_count = columns.len();
@@ -163,12 +201,12 @@ pub async fn produce(
             .iter()
             .any(|r| r.change_type.as_deref() == Some("Delete"));
         if has_delete {
-            backend.delete_rows(&db, &table, rows).await?
+            state.backend.delete_rows(&db, &table, rows, creds.as_ref()).await?
         } else {
-            backend.upsert_rows(&db, &table, rows).await?
+            state.backend.upsert_rows(&db, &table, rows, creds.as_ref()).await?
         }
     } else {
-        backend.append_rows(&db, &table, rows).await?
+        state.backend.append_rows(&db, &table, rows, creds.as_ref()).await?
     };
 
     Ok(Json(result))

@@ -1,67 +1,14 @@
 use axum::{
-    extract::Request,
     http::{HeaderValue, StatusCode},
-    response::{IntoResponse, Response},
+    response::Response,
 };
 use base64::Engine;
-use futures_util::future::BoxFuture;
-use std::task::{Context, Poll};
-use tower::{Layer, Service};
 
 /// Credentials extracted from HTTP Basic Auth.
 #[derive(Clone, Debug)]
 pub struct BasicAuthCredentials {
     pub username: String,
     pub password: String,
-}
-
-/// Axum layer that extracts HTTP Basic Auth credentials and stores them
-/// in request extensions. If no auth header is present, the request proceeds
-/// without credentials (for unauthenticated endpoints like /health).
-#[derive(Clone)]
-pub struct AuthLayer;
-
-impl<S> Layer<S> for AuthLayer {
-    type Service = AuthService<S>;
-
-    fn layer(&self, inner: S) -> Self::Service {
-        AuthService { inner }
-    }
-}
-
-#[derive(Clone)]
-pub struct AuthService<S> {
-    inner: S,
-}
-
-impl<S> Service<Request> for AuthService<S>
-where
-    S: Service<Request, Response = Response> + Clone + Send + 'static,
-    S::Future: Send + 'static,
-{
-    type Response = S::Response;
-    type Error = S::Error;
-    type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
-
-    fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        self.inner.poll_ready(cx)
-    }
-
-    fn call(&mut self, mut req: Request) -> Self::Future {
-        let inner = self.inner.clone();
-        let mut inner = std::mem::replace(&mut self.inner, inner);
-
-        Box::pin(async move {
-            if let Some(auth_header) = req.headers().get("authorization") {
-                if let Ok(auth_str) = auth_header.to_str() {
-                    if let Some(creds) = parse_basic_auth(auth_str) {
-                        req.extensions_mut().insert(creds);
-                    }
-                }
-            }
-            inner.call(req).await
-        })
-    }
 }
 
 pub(crate) fn parse_basic_auth(header_value: &str) -> Option<BasicAuthCredentials> {
@@ -84,12 +31,8 @@ pub(crate) fn parse_basic_auth(header_value: &str) -> Option<BasicAuthCredential
     Some(BasicAuthCredentials { username, password })
 }
 
-/// Require auth for a route. Returns 401 if no credentials are present.
-pub fn require_auth(req: &Request) -> Option<BasicAuthCredentials> {
-    req.extensions().get::<BasicAuthCredentials>().cloned()
-}
-
-/// Auth rejection response
+/// Auth rejection response for passthrough mode when credentials are missing.
+#[allow(dead_code)]
 pub fn auth_rejection() -> Response {
     let mut response = Response::new(axum::body::Body::from(
         serde_json::json!({

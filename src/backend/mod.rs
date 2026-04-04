@@ -1,68 +1,79 @@
 use fluss::client::FlussConnection;
-use fluss::config::Config;
 use fluss::metadata::TablePath;
 use fluss::row::GenericRow;
 use std::sync::Arc;
 
+use crate::config::AuthConfig;
+use crate::pool::ConnectionPool;
+use crate::server::auth::BasicAuthCredentials;
 use crate::types::{GatewayError, LookupParams, ScanParams, WriteResult, json_to_datum};
 
-/// FlussBackend wraps a FlussConnection and exposes high-level operations
-/// for the REST Gateway.
+/// FlussBackend wraps a ConnectionPool and exposes high-level operations
+/// for the REST Gateway. Each method takes per-request credentials to
+/// retrieve the appropriate FlussConnection from the pool.
 pub struct FlussBackend {
-    conn: Arc<FlussConnection>,
+    pool: Arc<ConnectionPool>,
+    auth: AuthConfig,
 }
 
 impl FlussBackend {
-    pub async fn new(coordinator_addr: &str) -> Result<Self, GatewayError> {
-        Self::with_auth(coordinator_addr, "", "").await
-    }
-
-    pub async fn with_auth(
-        coordinator_addr: &str,
-        username: &str,
-        password: &str,
+    pub async fn new(
+        coordinator: &str,
+        auth: AuthConfig,
+        pool_config: crate::config::PoolConfig,
     ) -> Result<Self, GatewayError> {
-        let mut config = Config::default();
-        config.bootstrap_servers = coordinator_addr.to_string();
-
-        if !username.is_empty() && !password.is_empty() {
-            config.security_protocol = "sasl".to_string();
-            config.security_sasl_mechanism = "PLAIN".to_string();
-            config.security_sasl_username = username.to_string();
-            config.security_sasl_password = password.to_string();
-        }
-
-        let conn = FlussConnection::new(config)
-            .await
-            .map_err(|e| GatewayError::ConnectionFailed(e.to_string()))?;
+        let pool = ConnectionPool::new(coordinator, auth.clone(), pool_config);
+        // Warm up: create the default connection using startup credentials
+        pool.get_or_create(None).await;
         Ok(Self {
-            conn: Arc::new(conn),
+            pool: Arc::new(pool),
+            auth,
         })
     }
 
-    pub fn conn(&self) -> &Arc<FlussConnection> {
-        &self.conn
+    /// Get a FlussConnection for the given credentials. When `creds` is `None`,
+    /// uses the startup credentials configured for the backend.
+    async fn conn(
+        &self,
+        creds: Option<&BasicAuthCredentials>,
+    ) -> Result<Arc<FlussConnection>, GatewayError> {
+        let (username, password) = match creds {
+            Some(c) => (c.username.clone(), c.password.clone()),
+            None => (self.auth.startup_username.clone(), self.auth.startup_password.clone()),
+        };
+        Ok(self.pool.get_or_create(Some((&username, &password))).await)
     }
 
     // === Metadata operations ===
 
-    pub async fn list_databases(&self) -> Result<Vec<String>, GatewayError> {
-        let admin = self.conn.get_admin().map_err(fluss_err)?;
+    pub async fn list_databases(
+        &self,
+        creds: Option<&BasicAuthCredentials>,
+    ) -> Result<Vec<String>, GatewayError> {
+        let conn = self.conn(creds).await?;
+        let admin = conn.get_admin().map_err(fluss_err)?;
         admin.list_databases().await.map_err(fluss_err)
     }
 
-    pub async fn list_tables(&self, database: &str) -> Result<Vec<String>, GatewayError> {
-        let admin = self.conn.get_admin().map_err(fluss_err)?;
-        admin.list_tables(database).await.map_err(fluss_err)
+    pub async fn list_tables(
+        &self,
+        db: &str,
+        creds: Option<&BasicAuthCredentials>,
+    ) -> Result<Vec<String>, GatewayError> {
+        let conn = self.conn(creds).await?;
+        let admin = conn.get_admin().map_err(fluss_err)?;
+        admin.list_tables(db).await.map_err(fluss_err)
     }
 
     pub async fn get_table_info(
         &self,
         db: &str,
         table: &str,
+        creds: Option<&BasicAuthCredentials>,
     ) -> Result<fluss::metadata::TableInfo, GatewayError> {
+        let conn = self.conn(creds).await?;
         let table_path = TablePath::new(db, table);
-        let fluss_table = self.conn.get_table(&table_path).await.map_err(fluss_err)?;
+        let fluss_table = conn.get_table(&table_path).await.map_err(fluss_err)?;
         Ok(fluss_table.get_table_info().clone())
     }
 
@@ -72,9 +83,11 @@ impl FlussBackend {
         db: &str,
         table: &str,
         params: &LookupParams,
+        creds: Option<&BasicAuthCredentials>,
     ) -> Result<Vec<serde_json::Value>, GatewayError> {
+        let conn = self.conn(creds).await?;
         let table_path = TablePath::new(db, table);
-        let fluss_table = self.conn.get_table(&table_path).await.map_err(fluss_err)?;
+        let fluss_table = conn.get_table(&table_path).await.map_err(fluss_err)?;
 
         if !fluss_table.has_primary_key() {
             return Err(GatewayError::InvalidOperation(
@@ -103,7 +116,7 @@ impl FlussBackend {
                 &serde_json::Value::String(value.to_string()),
                 col.data_type(),
             )
-            .map_err(|e| GatewayError::BadRequest(e))?;
+            .map_err(GatewayError::BadRequest)?;
             let field_idx = columns.iter().position(|c| c.name() == col_name).unwrap();
             row.set_field(field_idx, datum);
         }
@@ -126,9 +139,11 @@ impl FlussBackend {
         db: &str,
         table: &str,
         params: &ScanParams,
+        creds: Option<&BasicAuthCredentials>,
     ) -> Result<Vec<serde_json::Value>, GatewayError> {
+        let conn = self.conn(creds).await?;
         let table_path = TablePath::new(db, table);
-        let fluss_table = self.conn.get_table(&table_path).await.map_err(fluss_err)?;
+        let fluss_table = conn.get_table(&table_path).await.map_err(fluss_err)?;
 
         let mut table_scan = fluss_table.new_scan();
 
@@ -172,9 +187,11 @@ impl FlussBackend {
         db: &str,
         table: &str,
         rows: Vec<GenericRow<'_>>,
+        creds: Option<&BasicAuthCredentials>,
     ) -> Result<WriteResult, GatewayError> {
+        let conn = self.conn(creds).await?;
         let table_path = TablePath::new(db, table);
-        let fluss_table = self.conn.get_table(&table_path).await.map_err(fluss_err)?;
+        let fluss_table = conn.get_table(&table_path).await.map_err(fluss_err)?;
 
         if fluss_table.has_primary_key() {
             return Err(GatewayError::InvalidOperation(
@@ -203,9 +220,11 @@ impl FlussBackend {
         db: &str,
         table: &str,
         rows: Vec<GenericRow<'_>>,
+        creds: Option<&BasicAuthCredentials>,
     ) -> Result<WriteResult, GatewayError> {
+        let conn = self.conn(creds).await?;
         let table_path = TablePath::new(db, table);
-        let fluss_table = self.conn.get_table(&table_path).await.map_err(fluss_err)?;
+        let fluss_table = conn.get_table(&table_path).await.map_err(fluss_err)?;
 
         if !fluss_table.has_primary_key() {
             return Err(GatewayError::InvalidOperation(
@@ -234,9 +253,11 @@ impl FlussBackend {
         db: &str,
         table: &str,
         rows: Vec<GenericRow<'_>>,
+        creds: Option<&BasicAuthCredentials>,
     ) -> Result<WriteResult, GatewayError> {
+        let conn = self.conn(creds).await?;
         let table_path = TablePath::new(db, table);
-        let fluss_table = self.conn.get_table(&table_path).await.map_err(fluss_err)?;
+        let fluss_table = conn.get_table(&table_path).await.map_err(fluss_err)?;
 
         if !fluss_table.has_primary_key() {
             return Err(GatewayError::InvalidOperation(

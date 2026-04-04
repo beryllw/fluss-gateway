@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 use fluss::row::Datum;
 use ordered_float::OrderedFloat;
 use serde::{Deserialize, Serialize};
@@ -38,6 +39,7 @@ pub struct WriteResult {
 /// Produce request body
 #[derive(Debug, Deserialize)]
 pub struct ProduceRequest {
+    #[allow(dead_code)]
     pub format: Option<String>,
     pub rows: Vec<ProduceRow>,
 }
@@ -69,6 +71,9 @@ pub enum GatewayError {
 
     #[error("internal error: {0}")]
     Internal(String),
+
+    #[error("unauthorized: {0}")]
+    Unauthorized(String),
 }
 
 impl GatewayError {
@@ -80,6 +85,7 @@ impl GatewayError {
             GatewayError::ConnectionFailed(_) => 502,
             GatewayError::FlussError(_) => 500,
             GatewayError::Internal(_) => 500,
+            GatewayError::Unauthorized(_) => 401,
         }
     }
 
@@ -91,6 +97,7 @@ impl GatewayError {
             GatewayError::ConnectionFailed(_) => 50002,
             GatewayError::FlussError(_) => 50001,
             GatewayError::Internal(_) => 50001,
+            GatewayError::Unauthorized(_) => 40101,
         }
     }
 }
@@ -181,6 +188,7 @@ pub fn json_to_datum(
 }
 
 fn base64_encode(data: &[u8]) -> String {
+    #[allow(unused_imports)]
     use std::fmt::Write;
     let mut s = String::with_capacity(data.len() * 4 / 3 + 4);
     const CHARS: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
