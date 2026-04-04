@@ -28,4 +28,5 @@ base64 = "0.22"
 futures-util = "0.3"
 
 [dev-dependencies]
-reqwest = { version = "0.12", features = ["json"] }
+reqwest = { version = "0.12", features = ["json", "blocking"] }
+scopeguard = "1"
