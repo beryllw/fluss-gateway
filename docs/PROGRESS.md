@@ -8,8 +8,8 @@
 |-------|------|------|------|
 | Phase 1 | 基础框架 + 读取 | ✅ 完成 | 读取端点全部实现 |
 | Phase 2 | 写入路径 | ✅ 完成 | append/upsert/delete 已实现 |
-| Phase 3a | 修复集成测试 + 验证写入 | 🔜 下一步 | 有 bug 待修，见下 |
-| Phase 3b | 认证身份穿透重构 | 📋 已规划 | 方案已确定，见下 |
+| Phase 3a | 修复集成测试 + 验证写入 | ✅ 完成 | 12/12 集成测试通过 |
+| Phase 3b | 认证身份穿透重构 | 🔜 下一步 | 方案已确定，见下 |
 | Phase 4 | 部署完善 | 📋 已规划 | Docker + 物理机方案已确定 |
 
 ---
@@ -53,57 +53,19 @@
 
 ---
 
-## Phase 3a：集成测试 Bug 修复清单
+## Phase 3a：集成测试修复 ✅（已完成）
 
-> **目标**：修复后跑 `cargo test --test integration`，验证 HTTP 写入端到端可用。
+### 修复内容
 
-### Bug 1：`start_cluster` 未 await
+1. `tests/common.rs`：`is_gateway_ready()` 改为 async，用 `reqwest::Client`（blocking client 在 tokio 内 panic）
+2. `tests/common.rs`：`start_cluster()` 中 `is_gateway_ready_async()` → `is_gateway_ready().await`
+3. `tests/integration.rs`：`setup()` 中 `start_cluster().expect(...)` → `.await.expect(...)`
+4. `tests/common.rs`：`table_info()` 增加 HTTP 状态码检查（5xx 不再被当成 Ok）
+5. `docker-compose.yml`：镜像 tag `0.9.0` → `0.9.0-incubating`（本地可用镜像）
+6. `docker-compose.yml`：添加 `FLUSS://` 内部监听器（0.9.0-incubating 必须同时配置两种协议）
+7. `docker-compose.yml`：`advertised.listeners` CLIENT 改为 `localhost`（宿主机可解析）
 
-**文件**：`tests/integration.rs`，`setup()` 函数
-
-```rust
-// 当前（错误）：对 Future 调用 .expect()，编译报错
-start_cluster().expect("Failed to start cluster");
-
-// 修复：
-start_cluster().await.expect("Failed to start cluster");
-```
-
-### Bug 2：`is_gateway_ready_async` 不存在
-
-**文件**：`tests/common.rs`，`start_cluster()` 函数内部
-
-```rust
-// 当前（错误）：调用了未定义的函数
-if is_gateway_ready_async().await { ... }
-
-// 修复方案：改为在 spawn_blocking 中调用同步版本，或直接改用异步 HTTP client
-if tokio::task::spawn_blocking(is_gateway_ready).await.unwrap_or(false) { ... }
-```
-
-### Bug 3：`reqwest::blocking::Client` 在 async 上下文使用
-
-**文件**：`tests/common.rs`，`is_gateway_ready()` 函数
-
-`reqwest::blocking` 在 tokio 运行时内部调用会 panic（"Cannot start a runtime from within a tokio runtime"）。
-
-**修复方案**：将 `is_gateway_ready` 改为 async 函数，使用 `reqwest::Client`（异步版本）：
-
-```rust
-// 修复后：
-pub async fn is_gateway_ready() -> bool {
-    let client = reqwest::Client::builder()
-        .timeout(Duration::from_secs(2))
-        .build()
-        .unwrap_or_default();
-    client.get(format!("{}/health", GATEWAY_URL))
-        .send().await
-        .map(|r| r.status().is_success())
-        .unwrap_or(false)
-}
-
-// start_cluster 和 wait_for_gateway 中调用时直接 .await
-```
+**结果：12/12 集成测试全部通过**
 
 ---
 
@@ -262,20 +224,7 @@ systemctl start fluss-gateway
 
 按顺序执行：
 
-### Step 1：修复集成测试
-
-- [ ] `tests/common.rs`：将 `is_gateway_ready` 改为 async，使用 `reqwest::Client`
-- [ ] `tests/common.rs`：`start_cluster` 中调用 `is_gateway_ready().await`
-- [ ] `tests/integration.rs`：`start_cluster().await.expect(...)`
-- [ ] 验证 `cargo build` 通过
-
-### Step 2：验证 HTTP 写入
-
-- [ ] `docker compose -f deploy/docker/docker-compose.dev.yml up -d` 启动集群
-- [ ] `cargo test --test integration` 运行集成测试
-- [ ] 重点验证 `test_append_and_scan` 和 `test_upsert_and_lookup`
-
-### Step 3：认证重构（Phase 3b）
+### Step 3：认证重构（Phase 3b）🔜
 
 - [ ] 添加 `moka` 依赖
 - [ ] 实现 `src/config.rs`（`GatewayConfig` + `gateway.toml` 解析）
