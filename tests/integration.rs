@@ -19,12 +19,15 @@ async fn setup() -> GatewayClient {
     GatewayClient::new()
 }
 
-/// Teardown: stop cluster only when GATEWAY_KEEP_CLUSTER is NOT set.
-/// When tests run in parallel (default), teardown is a no-op to avoid
-/// killing the cluster mid-test.
+/// Teardown: no-op for parallel test safety.
+///
+/// All 19 tests share a single Fluss cluster. If the first test to finish
+/// kills the cluster, the other ~18 parallel tests will fail.
+///
+/// Clean up manually after all tests:
+///   podman compose -f deploy/docker/docker-compose.dev.yml --project-name fluss-gateway down
 fn teardown() {
-    // No-op: the cluster is shared across parallel tests.
-    // Clean up manually with `podman compose down` after test runs if needed.
+    // No-op: keep cluster alive for subsequent test runs.
 }
 
 // ============================================================================
