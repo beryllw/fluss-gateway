@@ -80,6 +80,135 @@ impl FlussBackend {
         Ok(fluss_table.get_table_info().clone())
     }
 
+    // === Metadata management operations ===
+
+    pub async fn create_database(
+        &self,
+        db_name: &str,
+        comment: Option<&str>,
+        custom_properties: &std::collections::HashMap<String, String>,
+        ignore_if_exists: bool,
+        creds: Option<&BasicAuthCredentials>,
+    ) -> Result<(), GatewayError> {
+        let conn = self.conn(creds).await?;
+        let admin = conn.get_admin().map_err(fluss_err)?;
+
+        let mut builder = fluss::metadata::DatabaseDescriptor::builder();
+        if let Some(c) = comment {
+            builder = builder.comment(c);
+        }
+        if !custom_properties.is_empty() {
+            builder = builder.custom_properties(custom_properties.clone());
+        }
+        let descriptor = builder.build();
+
+        admin
+            .create_database(db_name, Some(&descriptor), ignore_if_exists)
+            .await
+            .map_err(fluss_err)
+    }
+
+    pub async fn drop_database(
+        &self,
+        db_name: &str,
+        ignore_if_not_exists: bool,
+        cascade: bool,
+        creds: Option<&BasicAuthCredentials>,
+    ) -> Result<(), GatewayError> {
+        let conn = self.conn(creds).await?;
+        let admin = conn.get_admin().map_err(fluss_err)?;
+        admin
+            .drop_database(db_name, ignore_if_not_exists, cascade)
+            .await
+            .map_err(fluss_err)
+    }
+
+    pub async fn create_table(
+        &self,
+        db: &str,
+        table: &str,
+        schema: fluss::metadata::Schema,
+        partition_keys: Vec<String>,
+        bucket_count: Option<i32>,
+        bucket_keys: Vec<String>,
+        properties: std::collections::HashMap<String, String>,
+        comment: Option<String>,
+        ignore_if_exists: bool,
+        creds: Option<&BasicAuthCredentials>,
+    ) -> Result<(), GatewayError> {
+        let conn = self.conn(creds).await?;
+        let admin = conn.get_admin().map_err(fluss_err)?;
+        let table_path = TablePath::new(db, table);
+
+        let mut builder = fluss::metadata::TableDescriptor::builder()
+            .schema(schema)
+            .properties(properties);
+
+        if !partition_keys.is_empty() {
+            builder = builder.partitioned_by(partition_keys);
+        }
+
+        builder = builder.distributed_by(bucket_count, bucket_keys);
+
+        if let Some(c) = comment {
+            builder = builder.comment(c);
+        }
+
+        let descriptor = builder.build().map_err(fluss_err)?;
+        admin
+            .create_table(&table_path, &descriptor, ignore_if_exists)
+            .await
+            .map_err(fluss_err)
+    }
+
+    pub async fn drop_table(
+        &self,
+        db: &str,
+        table: &str,
+        ignore_if_not_exists: bool,
+        creds: Option<&BasicAuthCredentials>,
+    ) -> Result<(), GatewayError> {
+        let conn = self.conn(creds).await?;
+        let admin = conn.get_admin().map_err(fluss_err)?;
+        let table_path = TablePath::new(db, table);
+        admin
+            .drop_table(&table_path, ignore_if_not_exists)
+            .await
+            .map_err(fluss_err)
+    }
+
+    pub async fn list_offsets(
+        &self,
+        db: &str,
+        table: &str,
+        buckets: &[i32],
+        spec: fluss::rpc::message::OffsetSpec,
+        creds: Option<&BasicAuthCredentials>,
+    ) -> Result<std::collections::HashMap<i32, i64>, GatewayError> {
+        let conn = self.conn(creds).await?;
+        let admin = conn.get_admin().map_err(fluss_err)?;
+        let table_path = TablePath::new(db, table);
+        admin
+            .list_offsets(&table_path, buckets, spec)
+            .await
+            .map_err(fluss_err)
+    }
+
+    pub async fn list_partitions(
+        &self,
+        db: &str,
+        table: &str,
+        creds: Option<&BasicAuthCredentials>,
+    ) -> Result<Vec<fluss::metadata::PartitionInfo>, GatewayError> {
+        let conn = self.conn(creds).await?;
+        let admin = conn.get_admin().map_err(fluss_err)?;
+        let table_path = TablePath::new(db, table);
+        admin
+            .list_partition_infos(&table_path)
+            .await
+            .map_err(fluss_err)
+    }
+
     // === KV Lookup (point query on PK table) ===
     pub async fn lookup(
         &self,

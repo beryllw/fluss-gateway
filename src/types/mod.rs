@@ -50,6 +50,95 @@ pub struct ProduceRow {
     pub change_type: Option<String>,
 }
 
+// === Metadata Management DTOs ===
+
+/// Create database request body
+#[derive(Debug, Deserialize, Serialize)]
+pub struct CreateDatabaseRequest {
+    pub database_name: String,
+    pub comment: Option<String>,
+    #[serde(default)]
+    pub custom_properties: std::collections::HashMap<String, String>,
+    #[serde(default)]
+    pub ignore_if_exists: bool,
+}
+
+/// Drop database request body
+#[derive(Debug, Deserialize)]
+pub struct DropDatabaseRequest {
+    #[serde(default)]
+    pub ignore_if_not_exists: bool,
+    #[serde(default)]
+    pub cascade: bool,
+}
+
+/// Column specification for table creation
+#[derive(Debug, Deserialize)]
+pub struct ColumnSpec {
+    pub name: String,
+    pub data_type: String,
+    pub comment: Option<String>,
+}
+
+/// Primary key specification
+#[derive(Debug, Deserialize)]
+pub struct PrimaryKeySpec {
+    pub constraint_name: Option<String>,
+    pub column_names: Vec<String>,
+}
+
+/// Create table request body
+#[derive(Debug, Deserialize)]
+pub struct CreateTableRequest {
+    pub table_name: String,
+    pub schema: Vec<ColumnSpec>,
+    pub primary_key: Option<PrimaryKeySpec>,
+    pub partition_keys: Option<Vec<String>>,
+    pub bucket_count: Option<i32>,
+    pub bucket_keys: Option<Vec<String>>,
+    pub properties: Option<std::collections::HashMap<String, String>>,
+    pub comment: Option<String>,
+    #[serde(default)]
+    pub ignore_if_exists: bool,
+}
+
+/// Drop table request body
+#[derive(Debug, Deserialize)]
+pub struct DropTableRequest {
+    #[serde(default)]
+    pub ignore_if_not_exists: bool,
+}
+
+/// Offset information for a specific bucket
+#[derive(Debug, Serialize)]
+pub struct BucketOffset {
+    pub bucket_id: i32,
+    pub offset: i64,
+}
+
+/// List offsets response
+#[derive(Debug, Serialize)]
+pub struct ListOffsetsResponse {
+    pub table_path: String,
+    pub spec: String,
+    pub offsets: Vec<BucketOffset>,
+}
+
+/// List partitions response
+#[derive(Debug, Serialize)]
+pub struct ListPartitionsResponse {
+    pub table_path: String,
+    pub partitions: Vec<PartitionInfo>,
+}
+
+/// Partition information
+#[derive(Debug, Serialize)]
+pub struct PartitionInfo {
+    pub partition_id: i64,
+    pub partition_name: String,
+    pub partition_spec: std::collections::HashMap<String, String>,
+}
+
 // === Gateway Error ===
 
 #[derive(Debug, thiserror::Error)]

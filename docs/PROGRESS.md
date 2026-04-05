@@ -1,6 +1,6 @@
 # Fluss Gateway 项目进度
 
-> 最后更新：2026-04-05 08:30
+> 最后更新：2026-04-05 10:00
 
 ## 整体进度
 
@@ -13,7 +13,7 @@
 | Phase 4 | 部署完善 | ✅ 完成 | Docker + systemd + 运维脚本 |
 | Phase 5 | 运维 CLI + 优雅关闭 | ✅ 完成 | `serve` 子命令 + shell 脚本生命周期管理 |
 | Phase 6 | 中文文档 | ✅ 完成 | README 中文版 + API 文档 + 部署文档 |
-| Phase 7 | 元数据管理（核心需求） | 🔲 待开始 | 数据库/表 CRUD、分区管理、offset 查询 |
+| Phase 7 | 元数据管理（核心需求） | ✅ 完成 | 数据库/表 CRUD、分区管理、offset 查询 |
 | Phase 8 | 预编译发布包 | 🔲 待开始 | GitHub Releases 二进制、Docker Hub 镜像 |
 | Phase 9 | 监控可观测性 | 🔲 待开始 | Prometheus 指标、审计日志、结构化日志 |
 | Phase 10 | 流式消费 | 🔲 待开始 | SSE/WebSocket 流式消费、Offset 管理 |
@@ -29,13 +29,13 @@
 | `list_databases` | 元数据读 | ✅ |
 | `list_tables` | 元数据读 | ✅ |
 | `get_table_info` | 元数据读 | ✅ |
-| `create_database` | 元数据写 | 🔲 Phase 7 |
-| `drop_database` | 元数据写 | 🔲 Phase 7 |
-| `create_table` | 元数据写 | 🔲 Phase 7 |
-| `drop_table` | 元数据写 | 🔲 Phase 7 |
-| `alter_table` | 元数据写 | 🔲 Phase 7 |
-| `list_offsets` | 元数据读 | 🔲 Phase 7 |
-| `list_partitions` | 元数据读 | 🔲 Phase 7 |
+| `create_database` | 元数据写 | ✅ |
+| `drop_database` | 元数据写 | ✅ |
+| `create_table` | 元数据写 | ✅ |
+| `drop_table` | 元数据写 | ✅ |
+| `alter_table` | 元数据写 | ❌ fluss-rust 不支持 |
+| `list_offsets` | 元数据读 | ✅ |
+| `list_partitions` | 元数据读 | ✅ |
 | `lookup` | KV 点查 | ✅ |
 | `scan` | 日志扫描 | ✅ |
 | `append_rows` | 写入（Log 表） | ✅ |
@@ -56,12 +56,13 @@
 | POST | `/v1/{db}/{table}/batch` | ✅ |
 | POST | `/v1/{db}/{table}/scan` | ✅ |
 | POST | `/v1/{db}/{table}/rows` | ✅ |
-| POST | `/v1/_databases` | 🔲 Phase 7 |
-| DELETE | `/v1/_databases/{db}` | 🔲 Phase 7 |
-| POST | `/v1/{db}/_tables` | 🔲 Phase 7 |
-| PUT | `/v1/{db}/_tables/{table}` | 🔲 Phase 7 |
-| DELETE | `/v1/{db}/_tables/{table}` | 🔲 Phase 7 |
-| GET | `/v1/{db}/{table}/offsets` | 🔲 Phase 7 |
+| POST | `/v1/_databases` | ✅ 创建数据库 |
+| DELETE | `/v1/_databases/{db}` | ✅ 删除数据库 |
+| POST | `/v1/{db}/_tables` | ✅ 创建表 |
+| PUT | `/v1/{db}/_tables/{table}` | ❌ fluss-rust 不支持 |
+| DELETE | `/v1/{db}/_tables/{table}` | ✅ 删除表 |
+| POST | `/v1/{db}/{table}/offsets` | ✅ 查询 offset |
+| GET | `/v1/{db}/{table}/partitions` | ✅ 查询分区 |
 
 ### 其他
 

@@ -7,7 +7,7 @@ use axum::{
     extract::Request,
     middleware::Next,
     response::Response,
-    routing::{get, post},
+    routing::{get, post, delete, put},
     Router,
 };
 
@@ -90,13 +90,20 @@ impl GatewayServer {
 
         let api = Router::new()
             .route("/v1/_databases", get(rest::list_databases))
+            .route("/v1/_databases", post(rest::create_database))
+            .route("/v1/_databases/{db}", delete(rest::drop_database))
             .route("/v1/{db}/_tables", get(rest::list_tables))
+            .route("/v1/{db}/_tables", post(rest::create_table))
+            .route("/v1/{db}/_tables/{table}", put(rest::table_info))
+            .route("/v1/{db}/_tables/{table}", delete(rest::drop_table))
             .route("/v1/{db}/{table}/_info", get(rest::table_info))
             .route("/v1/{db}/{table}", get(rest::lookup))
             .route("/v1/{db}/{table}/prefix", get(rest::prefix_scan))
             .route("/v1/{db}/{table}/batch", post(rest::batch_lookup))
             .route("/v1/{db}/{table}/scan", post(rest::scan))
             .route("/v1/{db}/{table}/rows", post(rest::produce))
+            .route("/v1/{db}/{table}/offsets", post(rest::list_offsets))
+            .route("/v1/{db}/{table}/partitions", get(rest::list_partitions))
             .with_state(shared)
             .layer(axum::middleware::from_fn(auth_middleware));
 
