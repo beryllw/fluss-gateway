@@ -1,0 +1,39 @@
+# syntax=docker/dockerfile:1
+#
+# Multi-stage build for linux/amd64 on any host platform.
+# Usage: podman build --platform linux/amd64 -f deploy/docker/Dockerfile.build .
+#
+# This Dockerfile expects to be built from the project root directory.
+# The build context must include the parent directory so fluss-rust
+# (a local path dependency) is available.
+
+FROM --platform=linux/amd64 rust:bookworm-slim AS builder
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    pkg-config libssl-dev ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Copy fluss-rust first (it's a local path dependency)
+COPY ../fluss-rust /app/fluss-rust
+
+# Copy gateway source
+COPY Cargo.toml Cargo.lock ./
+COPY src/ src/
+
+RUN cargo build --release
+
+# ---- Runtime image ----
+FROM --platform=linux/amd64 debian:bookworm-slim
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY --from=builder /app/target/release/fluss-gateway /usr/local/bin/
+
+EXPOSE 8080
+
+ENTRYPOINT ["fluss-gateway"]
+CMD ["--host", "0.0.0.0", "--port", "8080"]

@@ -1,0 +1,41 @@
+# syntax=docker/dockerfile:1
+#
+# Self-contained Docker build for Fluss Gateway.
+# Uses the published fluss-rs crate from crates.io — no local dependencies needed.
+#
+# Usage:
+#   podman build --platform linux/amd64 -t apache/fluss-gateway:latest -f deploy/docker/Dockerfile.standalone .
+#   docker buildx build --platform linux/amd64 -t apache/fluss-gateway:latest -f deploy/docker/Dockerfile.standalone .
+
+FROM --platform=linux/amd64 rust:bookworm-slim AS builder
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    pkg-config libssl-dev ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Copy Cargo files
+COPY Cargo.toml Cargo.lock ./
+
+# Rewrite path dependency to published crate
+RUN sed -i 's|fluss = { path = ".*", package = "fluss-rs" }|fluss = { version = "0.1", package = "fluss-rs" }|' Cargo.toml
+
+# Copy source
+COPY src/ src/
+
+RUN cargo build --release
+
+# ---- Runtime image ----
+FROM --platform=linux/amd64 debian:bookworm-slim
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY --from=builder /app/target/release/fluss-gateway /usr/local/bin/
+
+EXPOSE 8080
+
+ENTRYPOINT ["fluss-gateway"]
+CMD ["--host", "0.0.0.0", "--port", "8080"]

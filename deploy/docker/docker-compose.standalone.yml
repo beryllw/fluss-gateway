@@ -1,0 +1,107 @@
+# Standalone Docker Compose — Fluss Gateway + Fluss Cluster
+#
+# Ready-to-use test environment for other projects.
+# One command to get a running Gateway with REST API.
+#
+# Usage:
+#   docker compose -f docker-compose.standalone.yml up -d
+#
+# After ~30 seconds (first pull may take longer):
+#   curl http://localhost:8080/health          # should return {"status":"ok"}
+#   curl http://localhost:8080/v1/_databases   # list databases
+#
+# Ports:
+#   8080 - Gateway REST API
+#   9123 - Fluss Coordinator (CLIENT)
+#   9124 - Fluss Tablet Server (CLIENT)
+#   2181 - ZooKeeper
+#
+# Environment variables (all optional):
+#   GATEWAY_PORT             default: 8080
+#   GATEWAY_AUTH_TYPE        default: none  | passthrough
+#   GATEWAY_FLUSS_COORDINATOR default: coordinator-server:9123
+#
+# Cleanup:
+#   docker compose -f docker-compose.standalone.yml down
+
+services:
+  zookeeper:
+    image: zookeeper:3.9.2
+    restart: unless-stopped
+    ports:
+      - "2181:2181"
+    healthcheck:
+      test: ["CMD", "bash", "-c", "echo ruok | nc localhost 2181 | grep imok"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+
+  coordinator-server:
+    image: apache/fluss:0.9.0-incubating
+    command: coordinatorServer
+    restart: unless-stopped
+    depends_on:
+      zookeeper:
+        condition: service_healthy
+    environment:
+      - |
+        FLUSS_PROPERTIES=
+        zookeeper.address: zookeeper:2181
+        bind.listeners: FLUSS://0.0.0.0:9333,CLIENT://0.0.0.0:9123
+        advertised.listeners: FLUSS://coordinator-server:9333,CLIENT://localhost:9123
+    ports:
+      - "9123:9123"
+    healthcheck:
+      test: ["CMD", "bash", "-c", "echo > /dev/tcp/localhost/9123"]
+      interval: 5s
+      timeout: 3s
+      retries: 15
+      start_period: 15s
+
+  tablet-server:
+    image: apache/fluss:0.9.0-incubating
+    command: tabletServer
+    restart: unless-stopped
+    depends_on:
+      coordinator-server:
+        condition: service_healthy
+    environment:
+      - |
+        FLUSS_PROPERTIES=
+        zookeeper.address: zookeeper:2181
+        bind.listeners: FLUSS://0.0.0.0:9333,CLIENT://0.0.0.0:9123
+        advertised.listeners: FLUSS://tablet-server:9333,CLIENT://localhost:9124
+        tablet-server.id: 0
+        kv.snapshot.interval: 0s
+    ports:
+      - "9124:9123"
+    healthcheck:
+      test: ["CMD", "bash", "-c", "echo > /dev/tcp/localhost/9123"]
+      interval: 5s
+      timeout: 3s
+      retries: 15
+      start_period: 15s
+
+  gateway:
+    build:
+      context: ../..
+      dockerfile: deploy/docker/Dockerfile.standalone
+    restart: unless-stopped
+    depends_on:
+      coordinator-server:
+        condition: service_healthy
+      tablet-server:
+        condition: service_healthy
+    environment:
+      - GATEWAY_PORT=${GATEWAY_PORT:-8080}
+      - GATEWAY_AUTH_TYPE=${GATEWAY_AUTH_TYPE:-none}
+      - GATEWAY_FLUSS_COORDINATOR=${GATEWAY_FLUSS_COORDINATOR:-coordinator-server:9123}
+    ports:
+      - "${GATEWAY_PORT:-8080}:8080"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
