@@ -17,6 +17,9 @@ pub struct FlussBackend {
 }
 
 impl FlussBackend {
+    pub fn pool(&self) -> &Arc<ConnectionPool> {
+        &self.pool
+    }
     pub async fn new(
         coordinator: &str,
         auth: AuthConfig,

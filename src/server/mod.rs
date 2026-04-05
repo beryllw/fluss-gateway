@@ -14,6 +14,33 @@ use axum::{
 use crate::backend::FlussBackend;
 use crate::config::GatewayConfig;
 
+/// Wait for SIGINT or SIGTERM and return, triggering graceful shutdown.
+async fn shutdown_signal() {
+    let ctrl_c = async {
+        tokio::signal::ctrl_c()
+            .await
+            .expect("failed to install ctrl_c handler");
+        tracing::info!("received shutdown signal (SIGINT)");
+    };
+
+    #[cfg(unix)]
+    let terminate = async {
+        tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())
+            .expect("failed to install SIGTERM handler")
+            .recv()
+            .await;
+        tracing::info!("received shutdown signal (SIGTERM)");
+    };
+
+    #[cfg(not(unix))]
+    let terminate = std::future::pending::<()>();
+
+    tokio::select! {
+        _ = ctrl_c => {},
+        _ = terminate => {},
+    }
+}
+
 pub struct GatewayServer {
     backend: Arc<FlussBackend>,
     config: GatewayConfig,
@@ -40,10 +67,17 @@ impl GatewayServer {
             .await
             .map_err(|e| crate::types::GatewayError::Internal(e.to_string()))?;
 
-        tracing::info!(addr = %addr, "listening");
+        let shutdown_signal = shutdown_signal();
+
+        tracing::info!("listening on {}", addr);
         axum::serve(listener, app)
+            .with_graceful_shutdown(shutdown_signal)
             .await
             .map_err(|e| crate::types::GatewayError::Internal(e.to_string()))?;
+
+        // Graceful shutdown: close the connection pool
+        self.backend.pool().close();
+        tracing::info!("server shut down gracefully");
 
         Ok(())
     }

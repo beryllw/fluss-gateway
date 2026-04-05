@@ -1,0 +1,28 @@
+[Unit]
+Description=Fluss Gateway - REST API Gateway for Apache Fluss
+Documentation=https://github.com/apache/fluss
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=fluss
+Group=fluss
+
+ExecStart=/usr/local/bin/fluss-gateway --config=/etc/fluss-gateway/gateway.toml
+Restart=on-failure
+RestartSec=5
+
+# Hardening
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/log/fluss-gateway
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=fluss-gateway
+
+[Install]
+WantedBy=multi-user.target

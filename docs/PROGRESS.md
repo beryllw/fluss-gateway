@@ -1,6 +1,6 @@
 # Fluss Gateway 项目进度
 
-> 最后更新：2026-04-04
+> 最后更新：2026-04-05 08:30
 
 ## 整体进度
 
@@ -10,7 +10,13 @@
 | Phase 2 | 写入路径 | ✅ 完成 | append/upsert/delete 已实现 |
 | Phase 3a | 修复集成测试 + 验证写入 | ✅ 完成 | 12/12 集成测试通过 |
 | Phase 3b | 认证身份穿透重构 | ✅ 完成 | moka 连接缓存 + 配置文件解析 |
-| Phase 4 | 部署完善 | 🔜 下一步 | Docker + 物理机方案已确定 |
+| Phase 4 | 部署完善 | ✅ 完成 | Docker + systemd + 运维脚本 |
+| Phase 5 | 运维 CLI + 优雅关闭 | ✅ 完成 | `serve` 子命令 + shell 脚本生命周期管理 |
+| Phase 6 | 中文文档 | ✅ 完成 | README 中文版 + API 文档 + 部署文档 |
+| Phase 7 | 元数据管理（核心需求） | 🔲 待开始 | 数据库/表 CRUD、分区管理、offset 查询 |
+| Phase 8 | 预编译发布包 | 🔲 待开始 | GitHub Releases 二进制、Docker Hub 镜像 |
+| Phase 9 | 监控可观测性 | 🔲 待开始 | Prometheus 指标、审计日志、结构化日志 |
+| Phase 10 | 流式消费 | 🔲 待开始 | SSE/WebSocket 流式消费、Offset 管理 |
 
 ---
 
@@ -23,6 +29,13 @@
 | `list_databases` | 元数据读 | ✅ |
 | `list_tables` | 元数据读 | ✅ |
 | `get_table_info` | 元数据读 | ✅ |
+| `create_database` | 元数据写 | 🔲 Phase 7 |
+| `drop_database` | 元数据写 | 🔲 Phase 7 |
+| `create_table` | 元数据写 | 🔲 Phase 7 |
+| `drop_table` | 元数据写 | 🔲 Phase 7 |
+| `alter_table` | 元数据写 | 🔲 Phase 7 |
+| `list_offsets` | 元数据读 | 🔲 Phase 7 |
+| `list_partitions` | 元数据读 | 🔲 Phase 7 |
 | `lookup` | KV 点查 | ✅ |
 | `scan` | 日志扫描 | ✅ |
 | `append_rows` | 写入（Log 表） | ✅ |
@@ -43,6 +56,12 @@
 | POST | `/v1/{db}/{table}/batch` | ✅ |
 | POST | `/v1/{db}/{table}/scan` | ✅ |
 | POST | `/v1/{db}/{table}/rows` | ✅ |
+| POST | `/v1/_databases` | 🔲 Phase 7 |
+| DELETE | `/v1/_databases/{db}` | 🔲 Phase 7 |
+| POST | `/v1/{db}/_tables` | 🔲 Phase 7 |
+| PUT | `/v1/{db}/_tables/{table}` | 🔲 Phase 7 |
+| DELETE | `/v1/{db}/_tables/{table}` | 🔲 Phase 7 |
+| GET | `/v1/{db}/{table}/offsets` | 🔲 Phase 7 |
 
 ### 其他
 
@@ -50,6 +69,30 @@
 - `json_to_datum` / `datum_to_json` 双向转换 ✅
 - HTTP Basic Auth 解析中间件 ✅（`src/server/auth.rs`）
 - Docker Compose 集成测试框架 ✅（`tests/integration.rs` + `tests/common.rs`）
+- 运维生命周期脚本 ✅（`bin/fluss-gateway.sh`）
+- `serve` CLI 子命令 ✅（`clap::Subcommand`）
+- 优雅关闭（SIGTERM/SIGINT + `with_graceful_shutdown`）✅
+
+---
+
+## Phase 5：运维 CLI + 优雅关闭方案
+
+### 架构
+
+```
+fluss-gateway serve [OPTIONS]       # Rust 子命令：前台启动
+bin/fluss-gateway.sh start [OPTS]   # Shell 脚本：nohup + PID 文件
+bin/fluss-gateway.sh stop            # Shell 脚本：读 PID，发 SIGTERM
+bin/fluss-gateway.sh restart         # Shell 脚本：stop + start
+bin/fluss-gateway.sh status          # Shell 脚本：查 PID + 健康检查
+```
+
+### 优雅关闭实现
+
+1. `src/server/mod.rs`：`run()` 增加 `shutdown_signal` 异步 future
+2. 监听 `SIGINT` (Ctrl+C) 和 `SIGTERM` (kill)
+3. 使用 `axum::serve().with_graceful_shutdown(shutdown_signal)` 等待现有请求完成
+4. 关闭后调用 `ConnectionPool::close()` 清空 moka 缓存
 
 ---
 
@@ -212,11 +255,13 @@ systemctl start fluss-gateway
 | 事项 | 优先级 | 说明 |
 |------|--------|------|
 | `prefix_scan` 实现 | 中 | 需调研 fluss-rust 前缀扫描 API |
-| 流式消费（WebSocket/SSE） | 低 | 非核心需求，后续迭代 |
-| 元数据管理（DB/Table CRUD） | 低 | 非核心需求 |
 | 限流（Tier 1 + Tier 2） | 中 | 参考 Kafka REST `ProduceRateLimiters` 四维限流 |
-| Prometheus 指标 | 低 | 后续监控需要 |
-| 审计日志 | 低 | 后续合规需要 |
+
+---
+
+## 开发规范
+
+- **功能开发完成后，必须同步更新对应的用户文档**（README、API 文档、部署文档等），确保代码变更与文档变更在同一个提交中。
 
 ---
 
@@ -224,21 +269,51 @@ systemctl start fluss-gateway
 
 按顺序执行：
 
-### Step 3：认证重构（Phase 3b）🔜
+### Step 5：运维 CLI + 优雅关闭（Phase 5）✅
 
-- [ ] 添加 `moka` 依赖
-- [ ] 实现 `src/config.rs`（`GatewayConfig` + `gateway.toml` 解析）
-- [ ] 实现 `src/pool.rs`（`ConnectionPool` wrapping moka cache）
-- [ ] 重构 `src/backend/mod.rs`（单连接 → 连接池）
-- [ ] 重构所有 handler（加 `Extension(Option<Credentials>)`）
-- [ ] 清理冗余的 `AuthLayer`/`AuthService`
+- [x] `src/main.rs` 重构为 clap Subcommand（`serve` 子命令）
+- [x] `src/server/mod.rs` 增加优雅关闭（SIGTERM/SIGINT + with_graceful_shutdown）
+- [x] `src/pool.rs` 增加 `close()` 方法
+- [x] `bin/fluss-gateway.sh` 运维脚本（start/stop/restart/status）
+- [x] 清理废弃的 `GatewayCliArgs` / `apply_cli_args`
 
-### Step 4：部署整理（Phase 4）
+### Step 6：中文文档（Phase 6）✅
 
-- [ ] 创建 `deploy/` 目录，迁移 Docker 文件
-- [ ] 新增 `deploy/docker/docker-compose.dev.yml`（从 `docker-compose.yml` 改造）
-- [ ] 新增 `deploy/docker/docker-compose.prod.yml`（仅 gateway 服务）
-- [ ] 新增 `deploy/systemd/fluss-gateway.service`
-- [ ] 新增 `deploy/config/gateway.toml.example`
-- [ ] 实现配置文件解析（`toml` crate）
-- [ ] 更新 `tests/common.rs` 中 `COMPOSE_FILE` 路径
+- [x] 中文 README（项目介绍、特性、架构说明、快速入门）
+- [x] 中文 API 文档（`docs/API_CN.md`，端点/请求/响应格式说明）
+- [x] 中文部署文档（`docs/DEPLOY_CN.md`，Docker/物理机/systemd）
+- [x] 中文运维手册（start/stop/restart/status 用法）
+
+### Step 7：元数据管理（Phase 7 — 核心需求）
+
+- [ ] `src/backend/mod.rs` 增加写方法：`create_database`, `drop_database`, `create_table`, `drop_table`, `alter_table`
+- [ ] `src/backend/mod.rs` 增加读方法：`list_offsets`, `list_partitions`
+- [ ] `src/types/mod.rs` 增加 DTO：`CreateDatabaseRequest`, `CreateTableRequest`, `AlterTableRequest`, `OffsetInfo`, `PartitionInfo`
+- [ ] `src/server/rest/mod.rs` 实现 handler：`create_database`, `drop_database`, `create_table`, `drop_table`, `alter_table`, `list_offsets`
+- [ ] `src/server/mod.rs` 注册新路由
+- [ ] 更新 API 文档（中英文）
+- [ ] 集成测试
+
+### Step 8：预编译发布包（Phase 8）
+
+目标：用户下载即可部署，无需从源码编译。
+
+- [ ] GitHub Actions CI：Linux x86_64/aarch64、macOS x86_64/aarch64 交叉编译
+- [ ] `cargo-dist` 打包：二进制 + `gateway.toml.example` + 运维脚本 + systemd unit
+- [ ] GitHub Releases 自动发布 `.tar.gz` 发布包
+- [ ] Docker Hub 自动构建多架构镜像（amd64/arm64）
+- [ ] 提供一键安装脚本 `curl ... | sh`
+
+### Step 9：监控可观测性（Phase 9）
+
+- [ ] Prometheus `/metrics` 端点（请求量、延迟、错误率、连接池状态）
+- [ ] 结构化日志（JSON 格式，支持 ELK/Loki 采集）
+- [ ] 审计日志（记录每个请求的用户、操作、结果）
+- [ ] Grafana dashboard 模板
+
+### Step 10：流式消费（Phase 10）
+
+- [ ] SSE（Server-Sent Events）流式消费端点
+- [ ] WebSocket 流式消费端点（可选）
+- [ ] Offset 提交/查询/重置
+- [ ] 消费者组管理

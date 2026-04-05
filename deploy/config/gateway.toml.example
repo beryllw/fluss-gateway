@@ -1,0 +1,21 @@
+# Fluss Gateway Example Configuration
+# Copy this file to /etc/fluss-gateway/gateway.toml and modify as needed.
+
+[server]
+host = "0.0.0.0"
+port = 8080
+
+[fluss]
+coordinator = "localhost:9123"
+
+[auth]
+# "none"     - use startup credentials for all requests
+# "passthrough" - extract per-user credentials from HTTP Basic Auth
+type = "none"
+
+[pool]
+max_connections = 500
+idle_timeout_secs = 600
+
+[log]
+level = "info"

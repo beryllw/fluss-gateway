@@ -30,6 +30,12 @@ impl ConnectionPool {
         }
     }
 
+    /// Gracefully close all cached connections by invalidating all entries.
+    pub fn close(&self) {
+        self.cache.invalidate_all();
+        tracing::info!("connection pool closed");
+    }
+
     /// Get an existing connection or create a new one for the given credentials.
     /// When `creds` is `None`, uses the startup credentials from config.
     pub async fn get_or_create(

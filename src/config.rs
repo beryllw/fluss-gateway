@@ -1,6 +1,5 @@
 use std::path::Path;
 
-use clap::Parser;
 use serde::Deserialize;
 
 /// Gateway configuration, loaded from `gateway.toml` and overridden by CLI args.
@@ -211,85 +210,4 @@ impl GatewayConfig {
             },
         })
     }
-
-    /// Override config fields with CLI args (CLI takes priority).
-    pub fn apply_cli_args(&mut self, args: &GatewayCliArgs) {
-        if let Some(ref v) = args.host {
-            self.server.host = v.clone();
-        }
-        if let Some(v) = args.port {
-            self.server.port = v;
-        }
-        if let Some(ref v) = args.fluss_coordinator {
-            self.fluss.coordinator = v.clone();
-        }
-        if let Some(ref v) = args.auth_type {
-            self.auth.r#type = match v.as_str() {
-                "none" => AuthType::None,
-                "passthrough" => AuthType::Passthrough,
-                _ => self.auth.r#type.clone(),
-            };
-        }
-        if let Some(ref v) = args.sasl_username {
-            self.auth.startup_username = v.clone();
-        }
-        if let Some(ref v) = args.sasl_password {
-            self.auth.startup_password = v.clone();
-        }
-        if let Some(v) = args.pool_max_connections {
-            self.pool.max_connections = v;
-        }
-        if let Some(v) = args.pool_idle_timeout_secs {
-            self.pool.idle_timeout_secs = v;
-        }
-        if let Some(ref v) = args.log_level {
-            self.log.level = v.clone();
-        }
-    }
-}
-
-/// CLI argument definitions (mirror of config fields).
-#[derive(Parser, Debug)]
-#[command(name = "fluss-gateway")]
-#[command(about = "REST API Gateway for Apache Fluss")]
-pub struct GatewayCliArgs {
-    /// Host to bind to
-    #[arg(long)]
-    pub host: Option<String>,
-
-    /// Port to listen on
-    #[arg(long)]
-    pub port: Option<u16>,
-
-    /// Fluss coordinator address (e.g. localhost:9123)
-    #[arg(long)]
-    pub fluss_coordinator: Option<String>,
-
-    /// Auth type
-    #[arg(long)]
-    pub auth_type: Option<String>,
-
-    /// SASL username for Fluss authentication (fallback in "none" mode)
-    #[arg(long)]
-    pub sasl_username: Option<String>,
-
-    /// SASL password for Fluss authentication (fallback in "none" mode)
-    #[arg(long)]
-    pub sasl_password: Option<String>,
-
-    /// Config file path
-    #[arg(long)]
-    pub config: Option<String>,
-
-    /// Pool max connections
-    #[arg(long)]
-    pub pool_max_connections: Option<u64>,
-
-    /// Pool idle timeout in seconds
-    #[arg(long)]
-    pub pool_idle_timeout_secs: Option<u64>,
-
-    /// Log level
-    #[arg(long)]
-    pub log_level: Option<String>,
 }

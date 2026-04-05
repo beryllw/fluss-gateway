@@ -13,7 +13,7 @@ use reqwest::Client;
 
 const GATEWAY_URL: &str = "http://localhost:8080";
 const FLUSS_COORDINATOR: &str = "localhost:9123";
-const COMPOSE_FILE: &str = "docker-compose.yml";
+const COMPOSE_FILE: &str = "deploy/docker/docker-compose.dev.yml";
 
 /// Start the Docker Compose cluster if not already running.
 pub async fn start_cluster() -> Result<(), String> {
