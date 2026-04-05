@@ -1,137 +1,16 @@
 //! Common utilities for integration tests.
 //!
 //! This module provides helpers for:
-//! - Docker Compose lifecycle management
 //! - Fluss client for table creation
 //! - HTTP client wrapper for gateway API
-//! - Retry/wait helpers for cluster readiness
 
 use std::process::Command;
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 use reqwest::Client;
 
 const GATEWAY_URL: &str = "http://localhost:8080";
 const FLUSS_COORDINATOR: &str = "localhost:9123";
-const COMPOSE_FILE: &str = "deploy/docker/docker-compose.dev.yml";
-const COMPOSE_PROJECT: &str = "fluss-gateway";
-
-// Global mutex to ensure only one test manages the cluster at a time
-static CLUSTER_MUTEX: std::sync::Mutex<()> = std::sync::Mutex::new(());
-
-/// Run a compose command with podman and the correct project name.
-fn compose(args: &[&str]) -> std::process::ExitStatus {
-    Command::new("podman")
-        .args(["compose", "--project-name", COMPOSE_PROJECT, "-f", COMPOSE_FILE])
-        .args(args)
-        .status()
-        .unwrap_or_else(|e| panic!("Failed to run podman compose: {}", e))
-}
-
-/// Start the compose cluster and gateway binary if not already running.
-pub async fn start_cluster() -> Result<(), String> {
-    let _lock = CLUSTER_MUTEX.lock();
-
-    // Check if gateway is already running
-    if is_gateway_ready().await {
-        println!("Gateway already running, skipping startup");
-        return Ok(());
-    }
-
-    println!("Starting Fluss cluster via podman compose...");
-    if !compose(&["up", "-d"]).success() {
-        return Err("podman compose up failed".to_string());
-    }
-
-    // Wait for Fluss to be healthy
-    let mut retries = 0;
-    while retries < 30 {
-        let status = Command::new("podman")
-            .args(["inspect", "--format={{.State.Health.Status}}", "fluss-gateway-coordinator-server-1"])
-            .output()
-            .ok()
-            .and_then(|o| String::from_utf8(o.stdout).ok());
-
-        if status.as_deref().map(|s| s.trim()) == Some("healthy") {
-            break;
-        }
-        tokio::time::sleep(std::time::Duration::from_secs(2)).await;
-        retries += 1;
-    }
-
-    // Start the gateway binary as a subprocess
-    println!("Starting gateway binary...");
-    let binary = env!("CARGO_BIN_EXE_fluss-gateway");
-    let child = Command::new(binary)
-        .arg("serve")
-        .arg("--fluss-coordinator=localhost:9123")
-        .arg("--port=8080")
-        .arg("--auth-type=none")
-        .spawn()
-        .map_err(|e| format!("Failed to start gateway binary: {}", e))?;
-
-    // Store PID for cleanup
-    let pid = child.id();
-    std::fs::write("/tmp/fluss-gateway-test.pid", pid.to_string())
-        .map_err(|e| format!("Failed to write PID: {}", e))?;
-
-    // Detach: we'll clean up via PID later
-    std::mem::forget(child);
-
-    Ok(())
-}
-
-/// Stop the compose cluster and gateway process (kept for manual use or GATEWAY_KEEP_CLUSTER).
-#[allow(dead_code)]
-pub fn stop_cluster() {
-    let _lock = CLUSTER_MUTEX.lock();
-
-    // Kill the gateway process
-    if let Ok(pid_str) = std::fs::read_to_string("/tmp/fluss-gateway-test.pid") {
-        if let Ok(pid) = pid_str.trim().parse::<i32>() {
-            let _ = Command::new("kill").arg(pid.to_string()).status();
-            let _ = std::fs::remove_file("/tmp/fluss-gateway-test.pid");
-        }
-    }
-
-    let _ = compose(&["down"]);
-}
-
-/// Check if the gateway health endpoint responds.
-pub async fn is_gateway_ready() -> bool {
-    let client = match reqwest::Client::builder()
-        .timeout(Duration::from_secs(2))
-        .build()
-    {
-        Ok(c) => c,
-        Err(_) => return false,
-    };
-    client
-        .get(format!("{}/health", GATEWAY_URL))
-        .send()
-        .await
-        .map(|r| r.status().is_success())
-        .unwrap_or(false)
-}
-
-/// Wait for the gateway to become ready, with a timeout.
-pub async fn wait_for_gateway(timeout_secs: u64) -> Result<(), String> {
-    let start = Instant::now();
-    let interval = Duration::from_secs(3);
-
-    while start.elapsed() < Duration::from_secs(timeout_secs) {
-        if is_gateway_ready().await {
-            println!("Gateway is ready!");
-            return Ok(());
-        }
-        tokio::time::sleep(interval).await;
-    }
-
-    Err(format!(
-        "Gateway did not become ready within {} seconds",
-        timeout_secs
-    ))
-}
 
 /// Create a test log table via Fluss client.
 pub async fn create_test_log_table(db: &str, table: &str) -> Result<(), String> {
@@ -150,7 +29,6 @@ pub async fn create_test_log_table(db: &str, table: &str) -> Result<(), String> 
         .get_admin()
         .map_err(|e| format!("Failed to get admin: {}", e))?;
 
-    // Ensure database exists
     let exists = admin
         .database_exists(db)
         .await
@@ -163,7 +41,6 @@ pub async fn create_test_log_table(db: &str, table: &str) -> Result<(), String> 
             .map_err(|e| format!("Failed to create database {}: {}", db, e))?;
     }
 
-    // Create log table (no primary key)
     let schema = Schema::builder()
         .column("id", DataType::Int(Default::default()))
         .column("name", DataType::String(Default::default()))
@@ -178,7 +55,6 @@ pub async fn create_test_log_table(db: &str, table: &str) -> Result<(), String> 
 
     let table_path = TablePath::new(db, table);
 
-    // Try to create, ignore if already exists
     let result = admin.create_table(&table_path, &descriptor, true).await;
 
     if let Err(e) = result {
@@ -205,7 +81,6 @@ pub async fn create_test_pk_table(db: &str, table: &str) -> Result<(), String> {
         .get_admin()
         .map_err(|e| format!("Failed to get admin: {}", e))?;
 
-    // Ensure database exists
     let exists = admin
         .database_exists(db)
         .await
@@ -218,7 +93,6 @@ pub async fn create_test_pk_table(db: &str, table: &str) -> Result<(), String> {
             .map_err(|e| format!("Failed to create database {}: {}", db, e))?;
     }
 
-    // Create PK table
     let schema = Schema::builder()
         .column("user_id", DataType::Int(Default::default()))
         .column("username", DataType::String(Default::default()))
@@ -573,4 +447,24 @@ impl GatewayClient {
 
         Ok(body)
     }
+}
+
+/// Stop the compose cluster and gateway process.
+/// Kept for manual invocation — teardown test handles cleanup automatically.
+#[allow(dead_code)]
+pub fn stop_cluster() {
+    const COMPOSE_FILE: &str = "deploy/docker/docker-compose.dev.yml";
+    const COMPOSE_PROJECT: &str = "fluss-gateway";
+
+    // Kill the gateway process
+    if let Ok(pid_str) = std::fs::read_to_string("/tmp/fluss-gateway-test.pid") {
+        if let Ok(pid) = pid_str.trim().parse::<i32>() {
+            let _ = Command::new("kill").arg(pid.to_string()).status();
+            let _ = std::fs::remove_file("/tmp/fluss-gateway-test.pid");
+        }
+    }
+
+    let _ = Command::new("podman")
+        .args(["compose", "--project-name", COMPOSE_PROJECT, "-f", COMPOSE_FILE, "down"])
+        .status();
 }

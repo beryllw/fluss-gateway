@@ -1,0 +1,47 @@
+//! Teardown test: cleans up the Fluss cluster and Gateway binary after integration tests.
+//!
+//! Run after integration tests: `cargo test --test teardown`
+
+use std::process::Command;
+
+const COMPOSE_FILE: &str = "deploy/docker/docker-compose.dev.yml";
+const COMPOSE_PROJECT: &str = "fluss-gateway";
+
+fn compose(args: &[&str]) -> std::process::ExitStatus {
+    Command::new("podman")
+        .args(["compose", "--project-name", COMPOSE_PROJECT, "-f", COMPOSE_FILE])
+        .args(args)
+        .status()
+        .unwrap_or_else(|e| panic!("Failed to run podman compose: {}", e))
+}
+
+#[test]
+fn test_teardown_cluster() {
+    // Kill the gateway process (started by setup test)
+    if let Ok(pid_str) = std::fs::read_to_string("/tmp/fluss-gateway-test.pid") {
+        if let Ok(pid) = pid_str.trim().parse::<i32>() {
+            println!("Killing gateway process (PID: {})", pid);
+            let _ = Command::new("kill").arg(pid.to_string()).status();
+            let _ = std::fs::remove_file("/tmp/fluss-gateway-test.pid");
+        }
+    }
+
+    // Stop Fluss cluster
+    println!("Stopping Fluss cluster...");
+    assert!(compose(&["down", "--remove-orphans"]).success(), "podman compose down failed");
+
+    // Remove any dangling containers from legacy runs (docker- prefix)
+    let output = Command::new("podman")
+        .args(["ps", "-a", "--filter", "name=^docker-", "--format", "{{.ID}}"])
+        .output()
+        .expect("Failed to list containers");
+
+    for id in String::from_utf8_lossy(&output.stdout).lines() {
+        if !id.is_empty() {
+            println!("Removing legacy container: {}", id);
+            let _ = Command::new("podman").args(["rm", "-f", id]).status();
+        }
+    }
+
+    println!("Teardown complete");
+}

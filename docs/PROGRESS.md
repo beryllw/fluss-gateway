@@ -69,10 +69,37 @@
 - `GatewayError` 类型体系 + HTTP/业务错误码 ✅
 - `json_to_datum` / `datum_to_json` 双向转换 ✅
 - HTTP Basic Auth 解析中间件 ✅（`src/server/auth.rs`）
-- Docker Compose 集成测试框架 ✅（`tests/integration.rs` + `tests/common.rs`）
+- Docker Compose 集成测试框架 ✅（`tests/setup.rs` + `tests/integration.rs` + `tests/teardown.rs`）
 - 运维生命周期脚本 ✅（`bin/fluss-gateway.sh`）
 - `serve` CLI 子命令 ✅（`clap::Subcommand`）
 - 优雅关闭（SIGTERM/SIGINT + `with_graceful_shutdown`）✅
+
+---
+
+## 集成测试流程
+
+集群生命周期从测试中解耦，通过三个独立文件管理：
+
+```bash
+cargo test --test setup          # 启动 Fluss 集群 + Gateway 二进制
+cargo test --test integration     # 运行 19 个并行集成测试
+cargo test --test teardown        # 关闭集群，清理容器和进程
+```
+
+| 文件 | 职责 |
+|------|------|
+| `tests/setup.rs` | 启动 podman compose (ZooKeeper + Coordinator + TabletServer)，启动 gateway 二进制（nohup），等待就绪 |
+| `tests/integration.rs` | 纯测试，假设集群已运行，无生命周期管理 |
+| `tests/teardown.rs` | 杀死 gateway 进程 + compose down + 清理遗留容器 |
+| `tests/common.rs` | `GatewayClient` 封装、测试表创建工具 |
+
+手动清理（如测试中断后）：
+```bash
+cargo test --test teardown
+# 或手动：
+kill $(cat /tmp/fluss-gateway-test.pid) 2>/dev/null
+podman compose -f deploy/docker/docker-compose.dev.yml --project-name fluss-gateway down
+```
 
 ---
 
