@@ -203,10 +203,19 @@ impl FlussBackend {
         let conn = self.conn(creds).await?;
         let admin = conn.get_admin().map_err(fluss_err)?;
         let table_path = TablePath::new(db, table);
-        admin
-            .list_partition_infos(&table_path)
-            .await
-            .map_err(fluss_err)
+        match admin.list_partition_infos(&table_path).await {
+            Ok(parts) => Ok(parts),
+            Err(e) => {
+                let err_str = e.to_string();
+                tracing::debug!("list_partition_infos error: {}", err_str);
+                // Non-partitioned tables return an error from Fluss; treat as empty
+                if err_str.contains("not a partitioned table") || err_str.contains("code: 37") {
+                    Ok(Vec::new())
+                } else {
+                    Err(fluss_err(e))
+                }
+            }
+        }
     }
 
     // === KV Lookup (point query on PK table) ===

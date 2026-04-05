@@ -8,7 +8,7 @@
 
 mod common;
 
-use common::{GatewayClient, create_test_log_table, create_test_pk_table, start_cluster, stop_cluster, wait_for_gateway};
+use common::{GatewayClient, create_test_log_table, create_test_pk_table, start_cluster, wait_for_gateway};
 
 /// Setup: start cluster and wait for readiness.
 async fn setup() -> GatewayClient {
@@ -19,11 +19,12 @@ async fn setup() -> GatewayClient {
     GatewayClient::new()
 }
 
-/// Teardown: stop cluster (only if GATEWAY_KEEP_CLUSTER env is not set).
+/// Teardown: stop cluster only when GATEWAY_KEEP_CLUSTER is NOT set.
+/// When tests run in parallel (default), teardown is a no-op to avoid
+/// killing the cluster mid-test.
 fn teardown() {
-    if std::env::var("GATEWAY_KEEP_CLUSTER").is_err() {
-        stop_cluster();
-    }
+    // No-op: the cluster is shared across parallel tests.
+    // Clean up manually with `podman compose down` after test runs if needed.
 }
 
 // ============================================================================
@@ -101,8 +102,8 @@ async fn test_append_and_scan() {
     let client = setup().await;
     let _guard = scopeguard::guard((), |_| teardown());
 
-    let db = "test_log_db";
-    let table = "test_log_table";
+    let db = "test_log_db_append";
+    let table = "test_log_table_append";
     create_test_log_table(db, table)
         .await
         .expect("Failed to create test table");
@@ -125,7 +126,7 @@ async fn test_append_and_scan() {
     assert_eq!(result["row_count"], 3);
 
     // Give Fluss a moment to commit
-    tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+    tokio::time::sleep(std::time::Duration::from_secs(3)).await;
 
     // Scan rows
     let rows = client
@@ -373,4 +374,147 @@ async fn test_lookup_missing_pk() {
         arr.is_empty(),
         "Expected empty result for non-existent key"
     );
+}
+
+// ============================================================================
+// Phase 7: Metadata Management
+// ============================================================================
+
+#[tokio::test]
+async fn test_create_database() {
+    let client = setup().await;
+    let _guard = scopeguard::guard((), |_| teardown());
+
+    let db = "test_create_db_meta";
+    let status = client.create_database(db).await.expect("create_database failed");
+    assert_eq!(status, 201, "Expected 201 Created, got {}", status);
+}
+
+#[tokio::test]
+async fn test_create_database_idempotent() {
+    let client = setup().await;
+    let _guard = scopeguard::guard((), |_| teardown());
+
+    let db = "test_idempotent_db";
+    let status1 = client.create_database(db).await.expect("create_database failed");
+    assert_eq!(status1, 201);
+
+    // Second create with ignore_if_exists=true should also succeed
+    let status2 = client.create_database(db).await.expect("create_database failed");
+    assert_eq!(status2, 201);
+}
+
+#[tokio::test]
+async fn test_drop_database() {
+    let client = setup().await;
+    let _guard = scopeguard::guard((), |_| teardown());
+
+    let db = "test_drop_db_meta";
+    // Ensure it exists
+    client.create_database(db).await.expect("create_database failed");
+
+    let status = client.drop_database(db).await.expect("drop_database failed");
+    assert_eq!(status, 204, "Expected 204 No Content, got {}", status);
+}
+
+#[tokio::test]
+async fn test_create_table_via_gateway() {
+    let client = setup().await;
+    let _guard = scopeguard::guard((), |_| teardown());
+
+    let db = "test_create_table_db";
+    client.create_database(db).await.expect("create_database failed");
+
+    let status = client
+        .create_table(db, "gateway_created_table")
+        .await
+        .expect("create_table failed");
+    assert_eq!(status, 201, "Expected 201 Created, got {}", status);
+
+    // Verify the table exists via list_tables
+    let tables = client.list_tables(db).await.expect("list_tables failed");
+    assert!(
+        tables.contains(&"gateway_created_table".to_string()),
+        "Expected table gateway_created_table in {:?}",
+        tables
+    );
+}
+
+#[tokio::test]
+async fn test_drop_table_via_gateway() {
+    let client = setup().await;
+    let _guard = scopeguard::guard((), |_| teardown());
+
+    let db = "test_drop_table_db";
+    client.create_database(db).await.expect("create_database failed");
+
+    // Create via gateway
+    client
+        .create_table(db, "table_to_drop")
+        .await
+        .expect("create_table failed");
+
+    // Drop via gateway
+    let status = client
+        .drop_table(db, "table_to_drop")
+        .await
+        .expect("drop_table failed");
+    assert_eq!(status, 204, "Expected 204 No Content, got {}", status);
+}
+
+#[tokio::test]
+async fn test_list_offsets() {
+    let client = setup().await;
+    let _guard = scopeguard::guard((), |_| teardown());
+
+    let db = "test_offsets_db";
+    let table = "test_offsets_table";
+    create_test_log_table(db, table)
+        .await
+        .expect("Failed to create test table");
+
+    // Write some data first
+    let result = client
+        .produce(
+            db,
+            table,
+            &serde_json::json!({
+                "rows": [{ "values": [1, "test", 42] }]
+            }),
+        )
+        .await
+        .expect("produce failed");
+    assert_eq!(result["row_count"], 1);
+
+    tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+
+    let offsets = client
+        .list_offsets(db, table)
+        .await
+        .expect("list_offsets failed");
+    assert!(offsets["offsets"].as_array().is_some());
+}
+
+#[tokio::test]
+async fn test_list_partitions_empty() {
+    let client = setup().await;
+    let _guard = scopeguard::guard((), |_| teardown());
+
+    let db = "test_partitions_db_v2";
+    let table = "test_partitions_table_v2";
+    create_test_log_table(db, table)
+        .await
+        .expect("Failed to create test table");
+
+    // Non-partitioned table should return empty partitions
+    let partitions = client
+        .list_partitions(db, table)
+        .await
+        .expect("list_partitions failed");
+    assert!(
+        partitions["partitions"].as_array().is_some(),
+        "Expected 'partitions' key in response: {:?}",
+        partitions
+    );
+    assert_eq!(partitions["partitions"].as_array().unwrap().len(), 0);
 }
