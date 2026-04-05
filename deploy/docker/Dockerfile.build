@@ -7,7 +7,7 @@
 # The build context must include the parent directory so fluss-rust
 # (a local path dependency) is available.
 
-FROM --platform=linux/amd64 rust:bookworm-slim AS builder
+FROM --platform=linux/amd64 rust:bookworm AS builder
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     pkg-config libssl-dev ca-certificates \

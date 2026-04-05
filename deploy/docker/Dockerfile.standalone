@@ -7,7 +7,7 @@
 #   podman build --platform linux/amd64 -t apache/fluss-gateway:latest -f deploy/docker/Dockerfile.standalone .
 #   docker buildx build --platform linux/amd64 -t apache/fluss-gateway:latest -f deploy/docker/Dockerfile.standalone .
 
-FROM --platform=linux/amd64 rust:bookworm-slim AS builder
+FROM --platform=linux/amd64 rust:bookworm AS builder
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     pkg-config libssl-dev ca-certificates \
