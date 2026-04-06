@@ -2,15 +2,17 @@
 #
 # Self-contained Docker build for Fluss Gateway.
 # Uses the published fluss-rs crate from crates.io — no local dependencies needed.
+# Builds natively for the host platform (no QEMU emulation).
 #
 # Usage:
-#   podman build --platform linux/amd64 -t apache/fluss-gateway:latest -f deploy/docker/Dockerfile.standalone .
-#   docker buildx build --platform linux/amd64 -t apache/fluss-gateway:latest -f deploy/docker/Dockerfile.standalone .
+#   podman build -t localhost/fluss-gateway:latest -f deploy/docker/Dockerfile.standalone .
+#   docker build -t localhost/fluss-gateway:latest -f deploy/docker/Dockerfile.standalone .
 
-FROM --platform=linux/amd64 rust:bookworm AS builder
+FROM rust:bookworm AS builder
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    pkg-config libssl-dev ca-certificates \
+RUN sed -i 's|deb.debian.org|mirrors.aliyun.com|g' /etc/apt/sources.list.d/debian.sources && \
+    apt-get update && apt-get install -y --no-install-recommends \
+    pkg-config libssl-dev protobuf-compiler ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
@@ -27,7 +29,7 @@ COPY src/ src/
 RUN cargo build --release
 
 # ---- Runtime image ----
-FROM --platform=linux/amd64 debian:bookworm-slim
+FROM debian:bookworm-slim
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \

@@ -1,0 +1,26 @@
+# syntax=docker/dockerfile:1
+#
+# Dockerfile for Fluss Gateway release images.
+# Expects the pre-compiled Linux binary in the build context.
+#
+# CI usage:
+#   1. Download pre-built binary from GitHub Releases
+#   2. podman build -t fluss-gateway:latest -f deploy/docker/Dockerfile.release .
+#
+# Local usage:
+#   1. Cross-compile: cargo build --release --target x86_64-unknown-linux-gnu
+#   2. cp target/x86_64-unknown-linux-gnu/release/fluss-gateway ./fluss-gateway
+#   3. podman build -t fluss-gateway:local -f deploy/docker/Dockerfile.release .
+
+FROM debian:bookworm-slim
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates curl \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY fluss-gateway /usr/local/bin/
+
+EXPOSE 8080
+
+ENTRYPOINT ["fluss-gateway"]
+CMD ["--host", "0.0.0.0", "--port", "8080"]
