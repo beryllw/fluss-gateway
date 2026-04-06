@@ -9,7 +9,7 @@ Type=simple
 User=fluss
 Group=fluss
 
-ExecStart=/usr/local/bin/fluss-gateway --config=/etc/fluss-gateway/gateway.toml
+ExecStart=/usr/local/bin/fluss-gateway serve --config=/etc/fluss-gateway/gateway.toml
 Restart=on-failure
 RestartSec=5
 
