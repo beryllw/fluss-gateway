@@ -2,24 +2,28 @@
 # Fluss Gateway installer for Linux.
 #
 # Usage:
-#   # From source tree (requires cargo build first):
-#   sudo bash deploy/install.sh
+#   # From downloaded release tarball (recommended):
+#   tar xzf fluss-gateway-x86_64-linux.tar.gz
+#   sudo bash install.sh
+#
+#   # From source tree (requires cargo):
+#   sudo bash install.sh
 #
 #   # With options:
-#   sudo bash deploy/install.sh --coordinator=coordinator-server:9123 --port=8080 --auth-type=none
+#   sudo bash install.sh --coordinator=coordinator-server:9123 --port=8080
 #
 # This script:
 #   1. Detects architecture (x86_64 / aarch64)
-#   2. Builds the binary if not present (requires cargo + rust toolchain)
+#   2. Uses pre-built binary if present, otherwise builds from source
 #   3. Creates system user, config dir, log dir
 #   4. Installs binary, config, systemd service
 #   5. Enables and starts the service
 #
 # Requirements:
 #   - Linux (x86_64 or aarch64)
-#   - cargo/rust toolchain (for building), OR pre-built binary
 #   - systemd
 #   - curl (for health checks)
+#   - cargo/rust toolchain (only if building from source)
 
 set -euo pipefail
 
@@ -64,7 +68,7 @@ for arg in "$@"; do
         --auth-type=*)   AUTH_TYPE="${arg#*=}" ;;
         --log-level=*)   LOG_LEVEL="${arg#*=}" ;;
         --help|-h)
-            echo "Usage: sudo bash deploy/install.sh [OPTIONS]"
+            echo "Usage: sudo bash install.sh [OPTIONS]"
             echo ""
             echo "Options:"
             echo "  --coordinator=ADDR   Fluss coordinator address (default: localhost:9123)"
@@ -108,24 +112,36 @@ check_systemd() {
 # Build binary if needed
 # ---------------------------------------------------------------------------
 build_binary() {
-    if [[ -x "$PROJECT_DIR/target/release/fluss-gateway" ]]; then
-        log "Found pre-built binary: $PROJECT_DIR/target/release/fluss-gateway"
+    # Check 1: pre-built binary in same directory as script (release tarball)
+    if [[ -x "$SCRIPT_DIR/fluss-gateway" ]]; then
+        log "Found pre-built binary: $SCRIPT_DIR/fluss-gateway"
+        BINARY_SOURCE="release"
         return 0
     fi
 
+    # Check 2: pre-built binary from cargo target (source tree)
+    if [[ -x "$PROJECT_DIR/target/release/fluss-gateway" ]]; then
+        log "Found pre-built binary: $PROJECT_DIR/target/release/fluss-gateway"
+        BINARY_SOURCE="source"
+        return 0
+    fi
+
+    # Check 3: build from source
     if ! command -v cargo &>/dev/null; then
         error "No pre-built binary found and cargo is not installed."
         error ""
         error "Options:"
-        error "  1. Build first: cd $PROJECT_DIR && cargo build --release"
-        error "  2. Install Rust: curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh"
-        error "  3. Use Docker: see deploy/docker/docker-compose.standalone.yml"
+        error "  1. Download a release tarball from: https://github.com/apache/fluss-gateway/releases"
+        error "  2. Build first: cd $PROJECT_DIR && cargo build --release"
+        error "  3. Install Rust: curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh"
+        error "  4. Use Docker: see deploy/docker/docker-compose.standalone.yml"
         exit 1
     fi
 
     log "Building fluss-gateway from source (this may take a few minutes)..."
     cd "$PROJECT_DIR"
     cargo build --release
+    BINARY_SOURCE="source"
     log "Build complete."
 }
 
@@ -134,7 +150,10 @@ build_binary() {
 # ---------------------------------------------------------------------------
 install_binary() {
     log "Installing binary to $INSTALL_BIN"
-    cp "$PROJECT_DIR/target/release/fluss-gateway" "$INSTALL_BIN"
+    case "$BINARY_SOURCE" in
+        release)  cp "$SCRIPT_DIR/fluss-gateway" "$INSTALL_BIN" ;;
+        source)   cp "$PROJECT_DIR/target/release/fluss-gateway" "$INSTALL_BIN" ;;
+    esac
     chmod 755 "$INSTALL_BIN"
 }
 
