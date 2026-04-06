@@ -39,6 +39,10 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Replace local path dependency with crates.io version
+        run: |
+          sed -i 's|fluss = { path = ".*", package = "fluss-rs" }|fluss = { version = "0.1", package = "fluss-rs" }|' Cargo.toml
+
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
         with:
