@@ -5,7 +5,7 @@ edition = "2021"
 description = "REST API Gateway for Apache Fluss"
 
 [dependencies]
-fluss = { path = "../fluss-rust/crates/fluss", package = "fluss-rs" }
+fluss = { version = "0.1", package = "fluss-rs" }
 
 axum = { version = "0.8", features = ["ws"] }
 tower = "0.5"

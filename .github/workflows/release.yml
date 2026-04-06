@@ -30,18 +30,11 @@ jobs:
           - os: macos-latest
             target: aarch64-apple-darwin
             artifact: fluss-gateway-aarch64-macos
-          - os: macos-13
-            target: x86_64-apple-darwin
-            artifact: fluss-gateway-x86_64-macos
     runs-on: ${{ matrix.os }}
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
-      - name: Replace local path dependency with crates.io version
-        run: |
-          sed -i 's|fluss = { path = ".*", package = "fluss-rs" }|fluss = { version = "0.1", package = "fluss-rs" }|' Cargo.toml
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
