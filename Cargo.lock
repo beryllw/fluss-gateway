@@ -857,7 +857,9 @@ dependencies = [
 
 [[package]]
 name = "fluss-rs"
-version = "0.2.0"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2fdc8c0e3bf3460948c4156fb733f00718932c95be16888b984336cc49f225fa"
 dependencies = [
  "arrow",
  "arrow-schema",
