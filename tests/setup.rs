@@ -31,7 +31,13 @@ fn runtime() -> &'static str {
 
 fn compose(args: &[&str]) -> std::process::ExitStatus {
     Command::new(runtime())
-        .args(["compose", "--project-name", COMPOSE_PROJECT, "-f", COMPOSE_FILE])
+        .args([
+            "compose",
+            "--project-name",
+            COMPOSE_PROJECT,
+            "-f",
+            COMPOSE_FILE,
+        ])
         .args(args)
         .status()
         .unwrap_or_else(|e| panic!("Failed to run {} compose: {}", runtime(), e))
@@ -39,7 +45,13 @@ fn compose(args: &[&str]) -> std::process::ExitStatus {
 
 fn container_state(container: &str) -> Option<String> {
     Command::new(runtime())
-        .args(["ps", "--filter", &format!("name={}", container), "--format", "{{.State}}"])
+        .args([
+            "ps",
+            "--filter",
+            &format!("name={}", container),
+            "--format",
+            "{{.State}}",
+        ])
         .output()
         .ok()
         .and_then(|o| String::from_utf8(o.stdout).ok())
@@ -96,7 +108,10 @@ async fn test_setup_cluster() {
         if health_status(COORDINATOR_NAME).as_deref() == Some("healthy") {
             break;
         }
-        assert!(start.elapsed() < Duration::from_secs(120), "Coordinator did not become healthy within 120s");
+        assert!(
+            start.elapsed() < Duration::from_secs(120),
+            "Coordinator did not become healthy within 120s"
+        );
         tokio::time::sleep(Duration::from_secs(2)).await;
     }
 
@@ -107,13 +122,17 @@ async fn test_setup_cluster() {
         if health_status(TABLET_NAME).as_deref() == Some("healthy") {
             break;
         }
-        assert!(start.elapsed() < Duration::from_secs(120), "Tablet server did not become healthy within 120s");
+        assert!(
+            start.elapsed() < Duration::from_secs(120),
+            "Tablet server did not become healthy within 120s"
+        );
         tokio::time::sleep(Duration::from_secs(2)).await;
     }
 
     // Start gateway binary via nohup so it survives after cargo test exits
     println!("Starting gateway binary...");
     let binary = env!("CARGO_BIN_EXE_fluss-gateway");
+    #[allow(clippy::zombie_processes)]
     let output = Command::new("nohup")
         .arg(binary)
         .arg("serve")
@@ -136,7 +155,10 @@ async fn test_setup_cluster() {
             println!("Gateway is ready! (PID: {})", pid);
             return;
         }
-        assert!(start.elapsed() < Duration::from_secs(60), "Gateway did not become ready within 60s");
+        assert!(
+            start.elapsed() < Duration::from_secs(60),
+            "Gateway did not become ready within 60s"
+        );
         tokio::time::sleep(Duration::from_secs(2)).await;
     }
 }

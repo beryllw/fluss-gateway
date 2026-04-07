@@ -20,7 +20,13 @@ fn runtime() -> &'static str {
 
 fn compose(args: &[&str]) -> std::process::ExitStatus {
     Command::new(runtime())
-        .args(["compose", "--project-name", COMPOSE_PROJECT, "-f", COMPOSE_FILE])
+        .args([
+            "compose",
+            "--project-name",
+            COMPOSE_PROJECT,
+            "-f",
+            COMPOSE_FILE,
+        ])
         .args(args)
         .status()
         .unwrap_or_else(|e| panic!("Failed to run {} compose: {}", runtime(), e))
@@ -41,7 +47,11 @@ fn test_teardown_cluster() {
 
     // Stop Fluss cluster
     println!("Stopping Fluss cluster...");
-    assert!(compose(&["down", "--remove-orphans"]).success(), "{} compose down failed", rt);
+    assert!(
+        compose(&["down", "--remove-orphans"]).success(),
+        "{} compose down failed",
+        rt
+    );
 
     // Remove any dangling containers from legacy runs (docker- prefix)
     let output = Command::new(rt)

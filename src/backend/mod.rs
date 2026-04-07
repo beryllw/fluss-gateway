@@ -6,7 +6,7 @@ use std::sync::Arc;
 use crate::config::AuthConfig;
 use crate::pool::ConnectionPool;
 use crate::server::auth::BasicAuthCredentials;
-use crate::types::{GatewayError, LookupParams, ScanParams, WriteResult, json_to_datum};
+use crate::types::{json_to_datum, GatewayError, LookupParams, ScanParams, WriteResult};
 
 /// FlussBackend wraps a ConnectionPool and exposes high-level operations
 /// for the REST Gateway. Each method takes per-request credentials to
@@ -42,7 +42,10 @@ impl FlussBackend {
     ) -> Result<Arc<FlussConnection>, GatewayError> {
         let (username, password) = match creds {
             Some(c) => (c.username.clone(), c.password.clone()),
-            None => (self.auth.startup_username.clone(), self.auth.startup_password.clone()),
+            None => (
+                self.auth.startup_username.clone(),
+                self.auth.startup_password.clone(),
+            ),
         };
         Ok(self.pool.get_or_create(Some((&username, &password))).await)
     }
@@ -123,6 +126,7 @@ impl FlussBackend {
             .map_err(fluss_err)
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub async fn create_table(
         &self,
         db: &str,
@@ -250,9 +254,10 @@ impl FlussBackend {
             let value = params.get(col_name).ok_or_else(|| {
                 GatewayError::BadRequest(format!("missing pk column: {}", col_name))
             })?;
-            let col = columns.iter().find(|c| c.name() == col_name).ok_or_else(|| {
-                GatewayError::BadRequest(format!("unknown column: {}", col_name))
-            })?;
+            let col = columns
+                .iter()
+                .find(|c| c.name() == col_name)
+                .ok_or_else(|| GatewayError::BadRequest(format!("unknown column: {}", col_name)))?;
             let datum = json_to_datum(
                 &serde_json::Value::String(value.to_string()),
                 col.data_type(),
@@ -292,7 +297,9 @@ impl FlussBackend {
             table_scan = table_scan.project(projection).map_err(fluss_err)?;
         }
 
-        let scanner = table_scan.create_record_batch_log_scanner().map_err(fluss_err)?;
+        let scanner = table_scan
+            .create_record_batch_log_scanner()
+            .map_err(fluss_err)?;
 
         // Subscribe to all buckets from earliest offset
         let table_info = fluss_table.get_table_info();
@@ -456,29 +463,61 @@ fn arrow_value_to_json(array: &dyn arrow::array::Array, idx: usize) -> serde_jso
 
     match array.data_type() {
         ArrowDataType::Boolean => serde_json::Value::Bool(
-            array.as_any().downcast_ref::<BooleanArray>().unwrap().value(idx),
+            array
+                .as_any()
+                .downcast_ref::<BooleanArray>()
+                .unwrap()
+                .value(idx),
         ),
         ArrowDataType::Int8 => serde_json::Value::Number(
-            array.as_any().downcast_ref::<Int8Array>().unwrap().value(idx).into(),
+            array
+                .as_any()
+                .downcast_ref::<Int8Array>()
+                .unwrap()
+                .value(idx)
+                .into(),
         ),
         ArrowDataType::Int16 => serde_json::Value::Number(
-            array.as_any().downcast_ref::<Int16Array>().unwrap().value(idx).into(),
+            array
+                .as_any()
+                .downcast_ref::<Int16Array>()
+                .unwrap()
+                .value(idx)
+                .into(),
         ),
         ArrowDataType::Int32 => serde_json::Value::Number(
-            array.as_any().downcast_ref::<Int32Array>().unwrap().value(idx).into(),
+            array
+                .as_any()
+                .downcast_ref::<Int32Array>()
+                .unwrap()
+                .value(idx)
+                .into(),
         ),
         ArrowDataType::Int64 => serde_json::Value::Number(
-            array.as_any().downcast_ref::<Int64Array>().unwrap().value(idx).into(),
+            array
+                .as_any()
+                .downcast_ref::<Int64Array>()
+                .unwrap()
+                .value(idx)
+                .into(),
         ),
         ArrowDataType::Float32 => serde_json::Value::Number(
             serde_json::Number::from_f64(
-                array.as_any().downcast_ref::<Float32Array>().unwrap().value(idx) as f64,
+                array
+                    .as_any()
+                    .downcast_ref::<Float32Array>()
+                    .unwrap()
+                    .value(idx) as f64,
             )
             .unwrap_or_else(|| serde_json::Number::from(0)),
         ),
         ArrowDataType::Float64 => serde_json::Value::Number(
             serde_json::Number::from_f64(
-                array.as_any().downcast_ref::<Float64Array>().unwrap().value(idx),
+                array
+                    .as_any()
+                    .downcast_ref::<Float64Array>()
+                    .unwrap()
+                    .value(idx),
             )
             .unwrap_or_else(|| serde_json::Number::from(0)),
         ),
@@ -550,7 +589,6 @@ mod tests {
 
     #[test]
     fn test_record_batch_to_json_empty() {
-        use arrow::array::Int32Array;
         use arrow::datatypes::{DataType, Field, Schema};
         let schema = Arc::new(Schema::new(vec![Field::new("id", DataType::Int32, true)]));
         let batch = arrow::array::RecordBatch::new_empty(schema);

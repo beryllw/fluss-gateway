@@ -8,7 +8,7 @@ use axum::{
     http::{HeaderValue, Method},
     middleware::Next,
     response::{IntoResponse, Response},
-    routing::{get, post, delete, put},
+    routing::{delete, get, post, put},
     Router,
 };
 
@@ -113,9 +113,7 @@ impl GatewayServer {
             }))
             .layer(axum::middleware::from_fn(auth_middleware));
 
-        Router::new()
-            .route("/health", get(rest::health))
-            .merge(api)
+        Router::new().route("/health", get(rest::health)).merge(api)
     }
 }
 
@@ -128,20 +126,17 @@ pub struct AppState {
 /// Middleware that checks the Content-Length of POST/PUT requests against
 /// the configured max body size. Returns HTTP 413 with a structured error
 /// JSON and the `X-Gateway-Max-Body-Size` header when the limit is exceeded.
-async fn body_limit_middleware(
-    req: Request,
-    next: Next,
-    max_body_size: usize,
-) -> Response {
+async fn body_limit_middleware(req: Request, next: Next, max_body_size: usize) -> Response {
     // Only enforce limits on methods that carry a request body
     if *req.method() == Method::POST || *req.method() == Method::PUT {
         if let Some(cl) = req.headers().get(axum::http::header::CONTENT_LENGTH) {
             if let Ok(len) = cl.to_str() {
                 if let Ok(size) = len.parse::<usize>() {
                     if size > max_body_size {
-                        let mut resp =
-                            crate::types::GatewayError::BodyLimitTooLarge { limit: max_body_size }
-                                .into_response();
+                        let mut resp = crate::types::GatewayError::BodyLimitTooLarge {
+                            limit: max_body_size,
+                        }
+                        .into_response();
                         resp.headers_mut().insert(
                             "X-Gateway-Max-Body-Size",
                             HeaderValue::from_str(&max_body_size.to_string()).unwrap(),
@@ -173,11 +168,11 @@ async fn auth_middleware(req: Request, next: Next) -> Response {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use axum::http;
     use axum::http::StatusCode;
+    use axum::routing::post;
     use axum::Json;
     use axum::Router;
-    use axum::http;
-    use axum::routing::post;
     use http_body_util::BodyExt;
     use serde_json::json;
     use tower::ServiceExt;
@@ -212,24 +207,27 @@ mod tests {
             .body(axum::body::Body::from(req_body))
             .unwrap();
 
-        let response =
-            ServiceExt::<http::Request<axum::body::Body>>::oneshot(app, request)
-                .await
-                .unwrap();
+        let response = ServiceExt::<http::Request<axum::body::Body>>::oneshot(app, request)
+            .await
+            .unwrap();
 
         let status = response.status();
         let headers = response.headers().clone();
         let body_bytes = response.into_body().collect().await.unwrap().to_bytes();
-        let json: serde_json::Value =
-            serde_json::from_slice(&body_bytes).unwrap_or_default();
+        let json: serde_json::Value = serde_json::from_slice(&body_bytes).unwrap_or_default();
         (status, json, headers)
     }
 
     #[tokio::test]
     async fn test_body_within_limit_passes() {
         let app = test_app(64);
-        let (status, _, _) =
-            call(app, Method::POST, "/echo", Some(json!({"hello":"world"}).to_string())).await;
+        let (status, _, _) = call(
+            app,
+            Method::POST,
+            "/echo",
+            Some(json!({"hello":"world"}).to_string()),
+        )
+        .await;
         assert_eq!(status, 200);
     }
 
@@ -240,14 +238,20 @@ mod tests {
 
         let big_body = json!({ "data": "a".repeat(200) });
         let body_str = big_body.to_string();
-        let (status, json, headers) =
-            call(app, Method::POST, "/echo", Some(body_str)).await;
+        let (status, json, headers) = call(app, Method::POST, "/echo", Some(body_str)).await;
 
         assert_eq!(status, 413);
         assert_eq!(json["error_code"], 41301);
-        assert!(json["message"].as_str().unwrap().contains(&limit.to_string()));
+        assert!(json["message"]
+            .as_str()
+            .unwrap()
+            .contains(&limit.to_string()));
         assert_eq!(
-            headers.get("X-Gateway-Max-Body-Size").unwrap().to_str().unwrap(),
+            headers
+                .get("X-Gateway-Max-Body-Size")
+                .unwrap()
+                .to_str()
+                .unwrap(),
             limit.to_string()
         );
     }
@@ -275,10 +279,9 @@ mod tests {
             .body(axum::body::Body::empty())
             .unwrap();
 
-        let response =
-            ServiceExt::<http::Request<axum::body::Body>>::oneshot(app, request)
-                .await
-                .unwrap();
+        let response = ServiceExt::<http::Request<axum::body::Body>>::oneshot(app, request)
+            .await
+            .unwrap();
 
         assert_eq!(response.status(), 200);
     }

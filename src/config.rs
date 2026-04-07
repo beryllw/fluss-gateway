@@ -149,7 +149,10 @@ impl GatewayConfig {
         }
         let content = std::fs::read_to_string(path)?;
         let file: FileConfig = toml::from_str(&content).map_err(|e| {
-            std::io::Error::new(std::io::ErrorKind::InvalidData, format!("invalid TOML: {e}"))
+            std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                format!("invalid TOML: {e}"),
+            )
         })?;
 
         let auth_type = match file.auth.as_ref().and_then(|a| a.r#type.as_deref()) {
@@ -170,7 +173,11 @@ impl GatewayConfig {
                     .as_ref()
                     .and_then(|s| s.host.clone())
                     .unwrap_or_default(),
-                port: file.server.as_ref().and_then(|s| s.port).unwrap_or_default(),
+                port: file
+                    .server
+                    .as_ref()
+                    .and_then(|s| s.port)
+                    .unwrap_or_default(),
                 max_body_size: file
                     .server
                     .as_ref()

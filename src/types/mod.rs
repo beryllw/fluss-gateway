@@ -259,7 +259,10 @@ mod tests {
     #[test]
     fn test_error_status_codes() {
         assert_eq!(GatewayError::BadRequest("x".into()).status_code(), 400);
-        assert_eq!(GatewayError::InvalidOperation("x".into()).status_code(), 422);
+        assert_eq!(
+            GatewayError::InvalidOperation("x".into()).status_code(),
+            422
+        );
         assert_eq!(GatewayError::FlussError("x".into()).status_code(), 500);
         assert_eq!(GatewayError::Internal("x".into()).status_code(), 500);
     }
@@ -267,7 +270,10 @@ mod tests {
     #[test]
     fn test_error_codes() {
         assert_eq!(GatewayError::BadRequest("x".into()).error_code(), 40001);
-        assert_eq!(GatewayError::InvalidOperation("x".into()).error_code(), 42205);
+        assert_eq!(
+            GatewayError::InvalidOperation("x".into()).error_code(),
+            42205
+        );
         assert_eq!(GatewayError::FlussError("x".into()).error_code(), 50001);
     }
 

@@ -10,7 +10,7 @@
 
 mod common;
 
-use common::{GatewayClient, create_test_log_table, create_test_pk_table};
+use common::{create_test_log_table, create_test_pk_table, GatewayClient};
 
 // ============================================================================
 // Health
@@ -30,7 +30,10 @@ async fn test_health() {
 #[tokio::test]
 async fn test_list_databases() {
     let client = GatewayClient::new();
-    let dbs = client.list_databases().await.expect("list_databases failed");
+    let dbs = client
+        .list_databases()
+        .await
+        .expect("list_databases failed");
     assert!(!dbs.is_empty(), "Expected at least one database");
 }
 
@@ -59,7 +62,10 @@ async fn test_table_info() {
     create_test_log_table(db, table)
         .await
         .expect("Failed to create test table");
-    let info = client.table_info(db, table).await.expect("table_info failed");
+    let info = client
+        .table_info(db, table)
+        .await
+        .expect("table_info failed");
     assert_eq!(info["database"], db);
     assert_eq!(info["table"], table);
     assert!(info["columns"].as_array().is_some());
@@ -148,7 +154,7 @@ async fn test_upsert_and_lookup() {
 
     let arr = rows.as_array().expect("lookup result should be array");
     assert!(
-        arr.len() >= 1,
+        !arr.is_empty(),
         "Expected at least 1 row from lookup, got {}: {:?}",
         arr.len(),
         rows
@@ -246,7 +252,9 @@ async fn test_batch_lookup() {
         .await
         .expect("batch lookup failed");
 
-    let arr = rows.as_array().expect("batch lookup result should be array");
+    let arr = rows
+        .as_array()
+        .expect("batch lookup result should be array");
     assert!(
         arr.len() >= 2,
         "Expected at least 2 rows from batch lookup, got {}: {:?}",
@@ -280,7 +288,9 @@ async fn test_batch_lookup_empty_keys() {
 #[tokio::test]
 async fn test_table_info_not_found() {
     let client = GatewayClient::new();
-    let result = client.table_info("nonexistent_db", "nonexistent_table").await;
+    let result = client
+        .table_info("nonexistent_db", "nonexistent_table")
+        .await;
     assert!(result.is_err(), "Expected error for non-existent table");
 }
 
@@ -316,10 +326,7 @@ async fn test_lookup_missing_pk() {
         .expect("lookup should not error");
 
     let arr = rows.as_array().expect("result should be array");
-    assert!(
-        arr.is_empty(),
-        "Expected empty result for non-existent key"
-    );
+    assert!(arr.is_empty(), "Expected empty result for non-existent key");
 }
 
 // ============================================================================
@@ -330,7 +337,10 @@ async fn test_lookup_missing_pk() {
 async fn test_create_database() {
     let client = GatewayClient::new();
     let db = "test_create_db_meta";
-    let status = client.create_database(db).await.expect("create_database failed");
+    let status = client
+        .create_database(db)
+        .await
+        .expect("create_database failed");
     assert_eq!(status, 201, "Expected 201 Created, got {}", status);
 }
 
@@ -338,9 +348,15 @@ async fn test_create_database() {
 async fn test_create_database_idempotent() {
     let client = GatewayClient::new();
     let db = "test_idempotent_db";
-    let status1 = client.create_database(db).await.expect("create_database failed");
+    let status1 = client
+        .create_database(db)
+        .await
+        .expect("create_database failed");
     assert_eq!(status1, 201);
-    let status2 = client.create_database(db).await.expect("create_database failed");
+    let status2 = client
+        .create_database(db)
+        .await
+        .expect("create_database failed");
     assert_eq!(status2, 201);
 }
 
@@ -348,8 +364,14 @@ async fn test_create_database_idempotent() {
 async fn test_drop_database() {
     let client = GatewayClient::new();
     let db = "test_drop_db_meta";
-    client.create_database(db).await.expect("create_database failed");
-    let status = client.drop_database(db).await.expect("drop_database failed");
+    client
+        .create_database(db)
+        .await
+        .expect("create_database failed");
+    let status = client
+        .drop_database(db)
+        .await
+        .expect("drop_database failed");
     assert_eq!(status, 204, "Expected 204 No Content, got {}", status);
 }
 
@@ -357,7 +379,10 @@ async fn test_drop_database() {
 async fn test_create_table_via_gateway() {
     let client = GatewayClient::new();
     let db = "test_create_table_db";
-    client.create_database(db).await.expect("create_database failed");
+    client
+        .create_database(db)
+        .await
+        .expect("create_database failed");
     let status = client
         .create_table(db, "gateway_created_table")
         .await
@@ -375,7 +400,10 @@ async fn test_create_table_via_gateway() {
 async fn test_drop_table_via_gateway() {
     let client = GatewayClient::new();
     let db = "test_drop_table_db";
-    client.create_database(db).await.expect("create_database failed");
+    client
+        .create_database(db)
+        .await
+        .expect("create_database failed");
     client
         .create_table(db, "table_to_drop")
         .await

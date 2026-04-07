@@ -13,9 +13,9 @@ use crate::config::AuthType;
 use crate::server::auth::BasicAuthCredentials;
 use crate::server::AppState;
 use crate::types::{
-    GatewayError, LookupParams, ProduceRequest, ScanParams, WriteResult, json_to_datum,
-    CreateDatabaseRequest, DropDatabaseRequest, CreateTableRequest, DropTableRequest,
-    ListOffsetsResponse, ListPartitionsResponse, BucketOffset,
+    json_to_datum, BucketOffset, CreateDatabaseRequest, CreateTableRequest, DropDatabaseRequest,
+    DropTableRequest, GatewayError, ListOffsetsResponse, ListPartitionsResponse, LookupParams,
+    ProduceRequest, ScanParams, WriteResult,
 };
 use fluss::rpc::message::OffsetSpec;
 
@@ -27,7 +27,8 @@ fn extract_creds(
     match auth_type {
         AuthType::None => Ok(None),
         AuthType::Passthrough => {
-            let ext = ext.ok_or_else(|| GatewayError::Unauthorized("authentication required".into()))?;
+            let ext =
+                ext.ok_or_else(|| GatewayError::Unauthorized("authentication required".into()))?;
             Ok(Some(ext.0))
         }
     }
@@ -66,7 +67,10 @@ pub async fn table_info(
     ext: Option<Extension<BasicAuthCredentials>>,
 ) -> Result<Json<TableInfoResponse>, GatewayError> {
     let creds = extract_creds(&state.auth_type, ext)?;
-    let info = state.backend.get_table_info(&db, &table, creds.as_ref()).await?;
+    let info = state
+        .backend
+        .get_table_info(&db, &table, creds.as_ref())
+        .await?;
     let schema = &info.schema;
     let columns: Vec<ColumnInfo> = schema
         .columns()
@@ -125,7 +129,9 @@ pub async fn prefix_scan(
     Path((_db, _table)): Path<(String, String)>,
     Query(_params): Query<HashMap<String, String>>,
 ) -> Result<Json<Vec<serde_json::Value>>, GatewayError> {
-    Err(GatewayError::Internal("prefix scan not yet implemented".into()))
+    Err(GatewayError::Internal(
+        "prefix scan not yet implemented".into(),
+    ))
 }
 
 // === Batch Lookup ===
@@ -163,7 +169,10 @@ pub async fn scan(
     Json(params): Json<ScanParams>,
 ) -> Result<Json<Vec<serde_json::Value>>, GatewayError> {
     let creds = extract_creds(&state.auth_type, ext)?;
-    let rows = state.backend.scan(&db, &table, &params, creds.as_ref()).await?;
+    let rows = state
+        .backend
+        .scan(&db, &table, &params, creds.as_ref())
+        .await?;
     Ok(Json(rows))
 }
 
@@ -178,15 +187,20 @@ pub async fn create_database(
     // Database name must be provided in request body
     let db_name = req.database_name.as_str();
     if db_name.is_empty() {
-        return Err(GatewayError::BadRequest("database_name is required in request body".into()));
+        return Err(GatewayError::BadRequest(
+            "database_name is required in request body".into(),
+        ));
     }
-    state.backend.create_database(
-        db_name,
-        req.comment.as_deref(),
-        &req.custom_properties,
-        req.ignore_if_exists,
-        creds.as_ref(),
-    ).await?;
+    state
+        .backend
+        .create_database(
+            db_name,
+            req.comment.as_deref(),
+            &req.custom_properties,
+            req.ignore_if_exists,
+            creds.as_ref(),
+        )
+        .await?;
     Ok(StatusCode::CREATED)
 }
 
@@ -197,7 +211,10 @@ pub async fn drop_database(
     Json(req): Json<DropDatabaseRequest>,
 ) -> Result<impl IntoResponse, GatewayError> {
     let creds = extract_creds(&state.auth_type, ext)?;
-    state.backend.drop_database(&db, req.ignore_if_not_exists, req.cascade, creds.as_ref()).await?;
+    state
+        .backend
+        .drop_database(&db, req.ignore_if_not_exists, req.cascade, creds.as_ref())
+        .await?;
     Ok(StatusCode::NO_CONTENT)
 }
 
@@ -210,7 +227,9 @@ pub async fn create_table(
     let creds = extract_creds(&state.auth_type, ext)?;
     let table_name = req.table_name.as_str();
     if table_name.is_empty() {
-        return Err(GatewayError::BadRequest("table_name is required in request body".into()));
+        return Err(GatewayError::BadRequest(
+            "table_name is required in request body".into(),
+        ));
     }
 
     // Build schema from column specs
@@ -227,7 +246,8 @@ pub async fn create_table(
     // Add primary key if specified
     if let Some(pk) = &req.primary_key {
         if let Some(ref constraint_name) = pk.constraint_name {
-            schema_builder = schema_builder.primary_key_named(constraint_name, pk.column_names.clone());
+            schema_builder =
+                schema_builder.primary_key_named(constraint_name, pk.column_names.clone());
         } else {
             schema_builder = schema_builder.primary_key(pk.column_names.clone());
         }
@@ -241,18 +261,21 @@ pub async fn create_table(
         properties.insert("table.comment".to_string(), c.clone());
     }
 
-    state.backend.create_table(
-        &db,
-        table_name,
-        schema,
-        req.partition_keys.clone().unwrap_or_default(),
-        req.bucket_count,
-        req.bucket_keys.clone().unwrap_or_default(),
-        properties,
-        req.comment.clone(),
-        req.ignore_if_exists,
-        creds.as_ref(),
-    ).await?;
+    state
+        .backend
+        .create_table(
+            &db,
+            table_name,
+            schema,
+            req.partition_keys.clone().unwrap_or_default(),
+            req.bucket_count,
+            req.bucket_keys.clone().unwrap_or_default(),
+            properties,
+            req.comment.clone(),
+            req.ignore_if_exists,
+            creds.as_ref(),
+        )
+        .await?;
     Ok(StatusCode::CREATED)
 }
 
@@ -263,7 +286,10 @@ pub async fn drop_table(
     Json(req): Json<DropTableRequest>,
 ) -> Result<impl IntoResponse, GatewayError> {
     let creds = extract_creds(&state.auth_type, ext)?;
-    state.backend.drop_table(&db, &table, req.ignore_if_not_exists, creds.as_ref()).await?;
+    state
+        .backend
+        .drop_table(&db, &table, req.ignore_if_not_exists, creds.as_ref())
+        .await?;
     Ok(StatusCode::NO_CONTENT)
 }
 
@@ -284,11 +310,19 @@ pub async fn list_offsets(
             })?;
             OffsetSpec::Timestamp(ts)
         }
-        other => return Err(GatewayError::BadRequest(format!("invalid offset spec: {}", other))),
+        other => {
+            return Err(GatewayError::BadRequest(format!(
+                "invalid offset spec: {}",
+                other
+            )))
+        }
     };
 
     let buckets: Vec<i32> = req.buckets.unwrap_or_else(|| (0..).take(1).collect());
-    let offsets = state.backend.list_offsets(&db, &table, &buckets, spec, creds.as_ref()).await?;
+    let offsets = state
+        .backend
+        .list_offsets(&db, &table, &buckets, spec, creds.as_ref())
+        .await?;
 
     let offset_list: Vec<BucketOffset> = offsets
         .into_iter()
@@ -308,7 +342,10 @@ pub async fn list_partitions(
     ext: Option<Extension<BasicAuthCredentials>>,
 ) -> Result<Json<ListPartitionsResponse>, GatewayError> {
     let creds = extract_creds(&state.auth_type, ext)?;
-    let partitions = state.backend.list_partitions(&db, &table, creds.as_ref()).await?;
+    let partitions = state
+        .backend
+        .list_partitions(&db, &table, creds.as_ref())
+        .await?;
 
     let partition_infos: Vec<crate::types::PartitionInfo> = partitions
         .into_iter()
@@ -344,7 +381,10 @@ fn parse_data_type(type_str: &str) -> Result<fluss::metadata::DataType, GatewayE
         "double" | "f64" => Ok(DataTypes::double()),
         "string" | "varchar" => Ok(DataTypes::string()),
         "bytes" | "binary" | "blob" => Ok(DataTypes::bytes()),
-        other => Err(GatewayError::BadRequest(format!("unsupported data type: {}", other))),
+        other => Err(GatewayError::BadRequest(format!(
+            "unsupported data type: {}",
+            other
+        ))),
     }
 }
 
@@ -389,12 +429,21 @@ pub async fn produce(
             .iter()
             .any(|r| r.change_type.as_deref() == Some("Delete"));
         if has_delete {
-            state.backend.delete_rows(&db, &table, rows, creds.as_ref()).await?
+            state
+                .backend
+                .delete_rows(&db, &table, rows, creds.as_ref())
+                .await?
         } else {
-            state.backend.upsert_rows(&db, &table, rows, creds.as_ref()).await?
+            state
+                .backend
+                .upsert_rows(&db, &table, rows, creds.as_ref())
+                .await?
         }
     } else {
-        state.backend.append_rows(&db, &table, rows, creds.as_ref()).await?
+        state
+            .backend
+            .append_rows(&db, &table, rows, creds.as_ref())
+            .await?
     };
 
     Ok(Json(result))

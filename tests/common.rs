@@ -17,8 +17,10 @@ pub async fn create_test_log_table(db: &str, table: &str) -> Result<(), String> 
     use fluss::config::Config;
     use fluss::metadata::{DataType, Schema, TableDescriptor, TablePath};
 
-    let mut config = Config::default();
-    config.bootstrap_servers = FLUSS_COORDINATOR.to_string();
+    let config = Config {
+        bootstrap_servers: FLUSS_COORDINATOR.to_string(),
+        ..Default::default()
+    };
 
     let conn = FlussConnection::new(config)
         .await
@@ -69,8 +71,10 @@ pub async fn create_test_pk_table(db: &str, table: &str) -> Result<(), String> {
     use fluss::config::Config;
     use fluss::metadata::{DataType, Schema, TableDescriptor, TablePath};
 
-    let mut config = Config::default();
-    config.bootstrap_servers = FLUSS_COORDINATOR.to_string();
+    let config = Config {
+        bootstrap_servers: FLUSS_COORDINATOR.to_string(),
+        ..Default::default()
+    };
 
     let conn = FlussConnection::new(config)
         .await
@@ -120,6 +124,12 @@ pub async fn create_test_pk_table(db: &str, table: &str) -> Result<(), String> {
 pub struct GatewayClient {
     client: Client,
     base_url: String,
+}
+
+impl Default for GatewayClient {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl GatewayClient {
@@ -189,10 +199,7 @@ impl GatewayClient {
     pub async fn table_info(&self, db: &str, table: &str) -> Result<serde_json::Value, String> {
         let resp = self
             .client
-            .get(format!(
-                "{}/v1/{}/{}/_info",
-                self.base_url, db, table
-            ))
+            .get(format!("{}/v1/{}/{}/_info", self.base_url, db, table))
             .send()
             .await
             .map_err(|e| format!("HTTP error: {}", e))?;
@@ -218,10 +225,7 @@ impl GatewayClient {
     ) -> Result<serde_json::Value, String> {
         let mut url = format!("{}/v1/{}/{}", self.base_url, db, table);
         if !params.is_empty() {
-            let qs: Vec<String> = params
-                .iter()
-                .map(|(k, v)| format!("{}={}", k, v))
-                .collect();
+            let qs: Vec<String> = params.iter().map(|(k, v)| format!("{}={}", k, v)).collect();
             url.push_str(&format!("?{}", qs.join("&")));
         }
 
@@ -396,11 +400,7 @@ impl GatewayClient {
         Ok(resp.status().as_u16())
     }
 
-    pub async fn list_offsets(
-        &self,
-        db: &str,
-        table: &str,
-    ) -> Result<serde_json::Value, String> {
+    pub async fn list_offsets(&self, db: &str, table: &str) -> Result<serde_json::Value, String> {
         let body = serde_json::json!({
             "spec": "earliest",
             "buckets": [0],

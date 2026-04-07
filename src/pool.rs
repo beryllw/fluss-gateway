@@ -38,10 +38,7 @@ impl ConnectionPool {
 
     /// Get an existing connection or create a new one for the given credentials.
     /// When `creds` is `None`, uses the startup credentials from config.
-    pub async fn get_or_create(
-        &self,
-        creds: Option<(&str, &str)>,
-    ) -> Arc<FlussConnection> {
+    pub async fn get_or_create(&self, creds: Option<(&str, &str)>) -> Arc<FlussConnection> {
         let (username, password) = match creds {
             Some((u, p)) => (u.to_string(), p.to_string()),
             None => (
@@ -71,11 +68,7 @@ fn hash_credentials(username: &str, password: &str) -> CredentialKey {
 }
 
 /// Create a new FlussConnection with optional SASL credentials.
-async fn create_connection(
-    coordinator: &str,
-    username: &str,
-    password: &str,
-) -> FlussConnection {
+async fn create_connection(coordinator: &str, username: &str, password: &str) -> FlussConnection {
     use fluss::config::Config;
 
     let config = Config {
@@ -95,7 +88,7 @@ async fn create_connection(
         ..Default::default()
     };
 
-    FlussConnection::new(config).await.unwrap_or_else(|e| {
-        panic!("failed to connect to Fluss coordinator {coordinator}: {e}")
-    })
+    FlussConnection::new(config)
+        .await
+        .unwrap_or_else(|e| panic!("failed to connect to Fluss coordinator {coordinator}: {e}"))
 }
