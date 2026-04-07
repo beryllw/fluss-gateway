@@ -839,6 +839,7 @@ dependencies = [
  "base64",
  "clap",
  "fluss-rs",
+ "http-body-util",
  "moka",
  "ordered-float",
  "reqwest",

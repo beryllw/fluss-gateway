@@ -163,6 +163,9 @@ pub enum GatewayError {
 
     #[error("unauthorized: {0}")]
     Unauthorized(String),
+
+    #[error("payload too large: request body exceeds the {limit} byte limit")]
+    BodyLimitTooLarge { limit: usize },
 }
 
 impl GatewayError {
@@ -175,6 +178,7 @@ impl GatewayError {
             GatewayError::FlussError(_) => 500,
             GatewayError::Internal(_) => 500,
             GatewayError::Unauthorized(_) => 401,
+            GatewayError::BodyLimitTooLarge { .. } => 413,
         }
     }
 
@@ -187,6 +191,7 @@ impl GatewayError {
             GatewayError::FlussError(_) => 50001,
             GatewayError::Internal(_) => 50001,
             GatewayError::Unauthorized(_) => 40101,
+            GatewayError::BodyLimitTooLarge { .. } => 41301,
         }
     }
 }

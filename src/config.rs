@@ -16,6 +16,7 @@ pub struct GatewayConfig {
 pub struct ServerConfig {
     pub host: String,
     pub port: u16,
+    pub max_body_size: usize,
 }
 
 impl Default for ServerConfig {
@@ -23,6 +24,7 @@ impl Default for ServerConfig {
         Self {
             host: "0.0.0.0".into(),
             port: 8080,
+            max_body_size: 16 * 1024 * 1024, // 16 MB
         }
     }
 }
@@ -110,6 +112,7 @@ struct FileConfig {
 struct FileServerConfig {
     host: Option<String>,
     port: Option<u16>,
+    max_body_size: Option<usize>,
 }
 
 #[derive(Deserialize, Default)]
@@ -168,6 +171,11 @@ impl GatewayConfig {
                     .and_then(|s| s.host.clone())
                     .unwrap_or_default(),
                 port: file.server.as_ref().and_then(|s| s.port).unwrap_or_default(),
+                max_body_size: file
+                    .server
+                    .as_ref()
+                    .and_then(|s| s.max_body_size)
+                    .unwrap_or(16 * 1024 * 1024),
             },
             fluss: FlussConfig {
                 coordinator: file

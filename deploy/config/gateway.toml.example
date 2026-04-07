@@ -4,6 +4,10 @@
 [server]
 host = "0.0.0.0"
 port = 8080
+# Maximum request body size in bytes (default: 16MB).
+# Clients should inspect the X-Gateway-Max-Body-Size response header
+# and split large payloads by row boundaries when a 413 is returned.
+max_body_size = 16777216
 
 [fluss]
 coordinator = "localhost:9123"
