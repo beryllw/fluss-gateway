@@ -45,7 +45,14 @@ fn test_teardown_cluster() {
 
     // Remove any dangling containers from legacy runs (docker- prefix)
     let output = Command::new(rt)
-        .args(["ps", "-a", "--filter", "name=^docker-", "--format", "{{.ID}}"])
+        .args([
+            "ps",
+            "-a",
+            "--filter",
+            "name=^docker-",
+            "--format",
+            "{{.ID}}",
+        ])
         .output()
         .expect("Failed to list containers");
 
