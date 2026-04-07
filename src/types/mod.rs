@@ -1,4 +1,3 @@
-#![allow(dead_code)]
 use fluss::row::Datum;
 use ordered_float::OrderedFloat;
 use serde::{Deserialize, Serialize};
@@ -143,9 +142,6 @@ pub struct PartitionInfo {
 
 #[derive(Debug, thiserror::Error)]
 pub enum GatewayError {
-    #[error("connection failed: {0}")]
-    ConnectionFailed(String),
-
     #[error("fluss error: {0}")]
     FlussError(String),
 
@@ -154,9 +150,6 @@ pub enum GatewayError {
 
     #[error("invalid operation: {0}")]
     InvalidOperation(String),
-
-    #[error("not found: {0}")]
-    NotFound(String),
 
     #[error("internal error: {0}")]
     Internal(String),
@@ -172,9 +165,7 @@ impl GatewayError {
     pub fn status_code(&self) -> u16 {
         match self {
             GatewayError::BadRequest(_) => 400,
-            GatewayError::NotFound(_) => 404,
             GatewayError::InvalidOperation(_) => 422,
-            GatewayError::ConnectionFailed(_) => 502,
             GatewayError::FlussError(_) => 500,
             GatewayError::Internal(_) => 500,
             GatewayError::Unauthorized(_) => 401,
@@ -185,9 +176,7 @@ impl GatewayError {
     pub fn error_code(&self) -> u16 {
         match self {
             GatewayError::BadRequest(_) => 40001,
-            GatewayError::NotFound(_) => 40401,
             GatewayError::InvalidOperation(_) => 42205,
-            GatewayError::ConnectionFailed(_) => 50002,
             GatewayError::FlussError(_) => 50001,
             GatewayError::Internal(_) => 50001,
             GatewayError::Unauthorized(_) => 40101,
@@ -196,27 +185,7 @@ impl GatewayError {
     }
 }
 
-// === Datum <-> JSON conversion ===
-
-pub fn datum_to_json(datum: &Datum) -> serde_json::Value {
-    match datum {
-        Datum::Null => serde_json::Value::Null,
-        Datum::Bool(v) => serde_json::Value::Bool(*v),
-        Datum::Int8(v) => serde_json::Value::Number((*v).into()),
-        Datum::Int16(v) => serde_json::Value::Number((*v).into()),
-        Datum::Int32(v) => serde_json::Value::Number((*v).into()),
-        Datum::Int64(v) => serde_json::Value::Number((*v).into()),
-        Datum::Float32(v) => serde_json::Value::Number(
-            serde_json::Number::from_f64(v.0 as f64).unwrap_or_else(|| serde_json::Number::from(0)),
-        ),
-        Datum::Float64(v) => serde_json::Value::Number(
-            serde_json::Number::from_f64(v.0).unwrap_or_else(|| serde_json::Number::from(0)),
-        ),
-        Datum::String(v) => serde_json::Value::String(v.to_string()),
-        Datum::Blob(v) => serde_json::Value::String(base64_encode(v)),
-        _ => serde_json::Value::String(format!("{:?}", datum)),
-    }
-}
+// === JSON -> Datum conversion ===
 
 pub fn json_to_datum(
     value: &serde_json::Value,
@@ -281,39 +250,6 @@ pub fn json_to_datum(
     }
 }
 
-fn base64_encode(data: &[u8]) -> String {
-    #[allow(unused_imports)]
-    use std::fmt::Write;
-    let mut s = String::with_capacity(data.len() * 4 / 3 + 4);
-    const CHARS: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-    let chunks = data.chunks_exact(3);
-    let remainder = chunks.remainder();
-    for chunk in chunks {
-        let n = ((chunk[0] as u32) << 16) | ((chunk[1] as u32) << 8) | (chunk[2] as u32);
-        s.push(CHARS[((n >> 18) & 0x3F) as usize] as char);
-        s.push(CHARS[((n >> 12) & 0x3F) as usize] as char);
-        s.push(CHARS[((n >> 6) & 0x3F) as usize] as char);
-        s.push(CHARS[(n & 0x3F) as usize] as char);
-    }
-    match remainder.len() {
-        2 => {
-            let n = ((remainder[0] as u32) << 8) | (remainder[1] as u32);
-            s.push(CHARS[((n >> 10) & 0x3F) as usize] as char);
-            s.push(CHARS[((n >> 4) & 0x3F) as usize] as char);
-            s.push(CHARS[((n << 2) & 0x3F) as usize] as char);
-            s.push('=');
-        }
-        1 => {
-            let n = remainder[0] as u32;
-            s.push(CHARS[((n >> 2) & 0x3F) as usize] as char);
-            s.push(CHARS[((n << 4) & 0x3F) as usize] as char);
-            s.push_str("==");
-        }
-        _ => {}
-    }
-    s
-}
-
 // === Unit tests ===
 
 #[cfg(test)]
@@ -323,9 +259,7 @@ mod tests {
     #[test]
     fn test_error_status_codes() {
         assert_eq!(GatewayError::BadRequest("x".into()).status_code(), 400);
-        assert_eq!(GatewayError::NotFound("x".into()).status_code(), 404);
         assert_eq!(GatewayError::InvalidOperation("x".into()).status_code(), 422);
-        assert_eq!(GatewayError::ConnectionFailed("x".into()).status_code(), 502);
         assert_eq!(GatewayError::FlussError("x".into()).status_code(), 500);
         assert_eq!(GatewayError::Internal("x".into()).status_code(), 500);
     }
@@ -333,22 +267,8 @@ mod tests {
     #[test]
     fn test_error_codes() {
         assert_eq!(GatewayError::BadRequest("x".into()).error_code(), 40001);
-        assert_eq!(GatewayError::NotFound("x".into()).error_code(), 40401);
         assert_eq!(GatewayError::InvalidOperation("x".into()).error_code(), 42205);
-        assert_eq!(GatewayError::ConnectionFailed("x".into()).error_code(), 50002);
         assert_eq!(GatewayError::FlussError("x".into()).error_code(), 50001);
-    }
-
-    #[test]
-    fn test_datum_to_json_primitives() {
-        assert_eq!(datum_to_json(&Datum::Null), serde_json::Value::Null);
-        assert_eq!(datum_to_json(&Datum::Bool(true)), serde_json::Value::Bool(true));
-        assert_eq!(datum_to_json(&Datum::Int32(42)), serde_json::json!(42));
-        assert_eq!(datum_to_json(&Datum::Int64(999)), serde_json::json!(999));
-        assert_eq!(
-            datum_to_json(&Datum::String("hello".into())),
-            serde_json::json!("hello")
-        );
     }
 
     #[test]

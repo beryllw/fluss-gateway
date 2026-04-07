@@ -1,7 +1,3 @@
-use axum::{
-    http::{HeaderValue, StatusCode},
-    response::Response,
-};
 use base64::Engine;
 
 /// Credentials extracted from HTTP Basic Auth.
@@ -29,23 +25,6 @@ pub(crate) fn parse_basic_auth(header_value: &str) -> Option<BasicAuthCredential
     }
 
     Some(BasicAuthCredentials { username, password })
-}
-
-/// Auth rejection response for passthrough mode when credentials are missing.
-#[allow(dead_code)]
-pub fn auth_rejection() -> Response {
-    let mut response = Response::new(axum::body::Body::from(
-        serde_json::json!({
-            "error_code": 40101,
-            "message": "authentication required"
-        })
-        .to_string(),
-    ));
-    *response.status_mut() = StatusCode::UNAUTHORIZED;
-    response
-        .headers_mut()
-        .insert("WWW-Authenticate", HeaderValue::from_static("Basic realm=\"Fluss Gateway\""));
-    response
 }
 
 #[cfg(test)]

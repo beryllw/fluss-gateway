@@ -834,7 +834,6 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "arrow",
- "arrow-schema",
  "axum",
  "base64",
  "clap",
@@ -843,7 +842,6 @@ dependencies = [
  "moka",
  "ordered-float",
  "reqwest",
- "scopeguard",
  "serde",
  "serde_json",
  "sha2",
@@ -851,7 +849,6 @@ dependencies = [
  "tokio",
  "toml",
  "tower",
- "tower-http",
  "tracing",
  "tracing-subscriber",
 ]
@@ -3051,7 +3048,6 @@ dependencies = [
  "tower",
  "tower-layer",
  "tower-service",
- "tracing",
 ]
 
 [[package]]

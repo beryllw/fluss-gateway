@@ -5,11 +5,11 @@ use std::sync::Arc;
 
 use axum::{
     extract::Request,
-    http::{HeaderValue, Method, StatusCode},
+    http::{HeaderValue, Method},
     middleware::Next,
     response::{IntoResponse, Response},
     routing::{get, post, delete, put},
-    Json, Router,
+    Router,
 };
 
 use crate::backend::FlussBackend;
@@ -139,14 +139,9 @@ async fn body_limit_middleware(
             if let Ok(len) = cl.to_str() {
                 if let Ok(size) = len.parse::<usize>() {
                     if size > max_body_size {
-                        let body = serde_json::json!({
-                            "error_code": 41301,
-                            "message": format!("request body exceeds the {max_body_size} byte limit"),
-                        });
-                        let mut resp = (
-                            StatusCode::PAYLOAD_TOO_LARGE,
-                            Json(body),
-                        ).into_response();
+                        let mut resp =
+                            crate::types::GatewayError::BodyLimitTooLarge { limit: max_body_size }
+                                .into_response();
                         resp.headers_mut().insert(
                             "X-Gateway-Max-Body-Size",
                             HeaderValue::from_str(&max_body_size.to_string()).unwrap(),
@@ -178,6 +173,8 @@ async fn auth_middleware(req: Request, next: Next) -> Response {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use axum::http::StatusCode;
+    use axum::Json;
     use axum::Router;
     use axum::http;
     use axum::routing::post;

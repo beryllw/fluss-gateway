@@ -4,7 +4,6 @@
 //! - Fluss client for table creation
 //! - HTTP client wrapper for gateway API
 
-use std::process::Command;
 use std::time::Duration;
 
 use reqwest::Client;
@@ -447,24 +446,4 @@ impl GatewayClient {
 
         Ok(body)
     }
-}
-
-/// Stop the compose cluster and gateway process.
-/// Kept for manual invocation — teardown test handles cleanup automatically.
-#[allow(dead_code)]
-pub fn stop_cluster() {
-    const COMPOSE_FILE: &str = "deploy/docker/docker-compose.dev.yml";
-    const COMPOSE_PROJECT: &str = "fluss-gateway";
-
-    // Kill the gateway process
-    if let Ok(pid_str) = std::fs::read_to_string("/tmp/fluss-gateway-test.pid") {
-        if let Ok(pid) = pid_str.trim().parse::<i32>() {
-            let _ = Command::new("kill").arg(pid.to_string()).status();
-            let _ = std::fs::remove_file("/tmp/fluss-gateway-test.pid");
-        }
-    }
-
-    let _ = Command::new("podman")
-        .args(["compose", "--project-name", COMPOSE_PROJECT, "-f", COMPOSE_FILE, "down"])
-        .status();
 }
