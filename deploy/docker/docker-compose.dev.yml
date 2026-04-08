@@ -9,7 +9,7 @@
 #      docker compose -f deploy/docker/docker-compose.dev.yml up -d
 #
 #   2. Build and run Gateway locally:
-#      cargo run --release -- --host=0.0.0.0 --port=8080 --fluss-coordinator=localhost:9123
+#      cargo run --release -- serve --host=0.0.0.0 --port=8080 --fluss-coordinator=localhost:9123
 #
 #   3. Run integration tests:
 #      cargo test --test integration
