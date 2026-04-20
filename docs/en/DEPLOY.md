@@ -5,22 +5,22 @@
 ```
 deploy/
 ├── docker/
-│   ├── Dockerfile.standalone      # Self-contained build (includes Fluss cluster)
-│   ├── Dockerfile.release          # Release publish image
+│   ├── Dockerfile.standalone      # Self-built image (with Fluss cluster)
+│   ├── Dockerfile.release          # Release image
 │   ├── docker-compose.standalone.yml # Dev environment (with Fluss cluster)
 │   └── docker-compose.prod.yml     # Production (Gateway only)
 ├── systemd/
-│   └── fluss-gateway.service       # systemd unit template
+│   └── fluss-gateway.service       # systemd unit file template
 ├── config/
-│   └── gateway.toml.example        # Example config
+│   └── gateway.toml.example        # Example configuration file
 └── install.sh                      # One-click install script
 ```
 
 ---
 
-## Method 1: Docker Compose (One-Click Full Environment)
+## Method 1: Docker Compose (Full Environment)
 
-For quick testing or when you don't have an existing Fluss cluster. Starts Fluss cluster + Gateway together.
+Suitable for quick testing or when you don't have an existing Fluss cluster. Fluss cluster + Gateway start together.
 
 ```bash
 # 1. Clone the repository
@@ -39,7 +39,7 @@ curl http://localhost:8080/health
 # Should return: {"status":"ok"}
 ```
 
-**Cleanup**:
+**Cleanup:**
 ```bash
 docker compose -f deploy/docker/docker-compose.standalone.yml --project-name fluss-gateway down
 ```
@@ -48,7 +48,7 @@ docker compose -f deploy/docker/docker-compose.standalone.yml --project-name flu
 
 ## Method 2: Docker Compose (Gateway Only, Connect to Existing Fluss)
 
-For when you already have a Fluss cluster and just need to add Gateway.
+Suitable when you already have a Fluss cluster and just need to add Gateway.
 
 Create `docker-compose.yml`:
 
@@ -79,33 +79,33 @@ docker compose up -d
 curl http://localhost:8080/health
 ```
 
-> Without the `command` override, the default CMD is `fluss-gateway serve --host 0.0.0.0 --port 8080`.
-> You still need to specify `fluss.coordinator` via config file or environment.
+> Without overriding `command`, the default startup args are `fluss-gateway serve --host 0.0.0.0 --port 8080`.
+> You still need to specify `fluss.coordinator` via environment variable or config file.
 
 ---
 
-## Method 3: GitHub Release Download (Recommended, No Build)
+## Method 3: GitHub Release Download & Install (Recommended, No Compilation)
 
-Download pre-built binaries from GitHub Releases — no local compilation needed.
+Download pre-built binaries from the GitHub Releases page, no local compilation needed.
 
-### 1. Choose the Right Release Package
+### 1. Select the Release Package for Your Platform
 
-Visit [GitHub Releases](https://github.com/<owner>/fluss-gateway/releases) and pick the tarball for your platform:
+Visit [GitHub Releases](https://github.com/<owner>/fluss-gateway/releases) and select the tarball for your architecture:
 
 | Filename | Platform | Architecture |
-|----------|---------|-------------|
+|----------|----------|--------------|
 | `fluss-gateway-x86_64-linux.tar.gz` | Linux | x86_64 (amd64) |
 | `fluss-gateway-aarch64-linux.tar.gz` | Linux | ARM64 |
 | `fluss-gateway-aarch64-macos.tar.gz` | macOS | Apple Silicon (M1/M2/M3) |
 
 Each tarball contains:
 - `fluss-gateway` — pre-built binary
-- `gateway.toml.example` — example config
+- `gateway.toml.example` — example configuration file
 - `install.sh` — one-click install script (Linux only)
 
-### 2. Download and Install
+### 2. Download & Install
 
-**Automated install** (recommended, Linux only):
+**Automatic install** (recommended, Linux only):
 
 ```bash
 # Download the tarball for your architecture
@@ -119,14 +119,14 @@ sudo bash install.sh \
   --auth-type=none
 ```
 
-The `install.sh` script automatically:
-- Installs the binary to `/usr/local/bin/fluss-gateway`
-- Creates the `fluss` system user
-- Generates config at `/etc/fluss-gateway/gateway.toml`
-- Installs and starts the systemd service
-- Runs a health check to confirm the service is ready
+`install.sh` automatically:
+- Installs binary to `/usr/local/bin/fluss-gateway`
+- Creates `fluss` system user
+- Generates configuration to `/etc/fluss-gateway/gateway.toml`
+- Installs and starts systemd service
+- Runs health check to confirm service readiness
 
-**Manual install** (macOS or when you don't want to use the script):
+**Manual install** (macOS or if you prefer not to use the script):
 
 ```bash
 # Extract
@@ -148,9 +148,9 @@ sudo vi /etc/fluss-gateway/gateway.toml
 fluss-gateway serve --config=/etc/fluss-gateway/gateway.toml
 ```
 
-### 3. One-Line Install via curl
+### 3. One-Click Install via CLI
 
-You can also download and install in a single pipeline (Linux x86_64):
+You can also download and install directly via `curl` (Linux x86_64):
 
 ```bash
 # Set variables (replace with actual version)
@@ -168,7 +168,7 @@ sudo bash install.sh --coordinator=localhost:9123
 
 ## Method 4: Build from Source + systemd Deployment
 
-No Docker, suitable for production or custom development.
+No Docker required, suitable for production environments or custom development.
 
 ### 1. Build the Binary
 
@@ -189,7 +189,7 @@ sudo mkdir -p /etc/fluss-gateway
 sudo mkdir -p /var/log/fluss-gateway
 sudo chown fluss:fluss /var/log/fluss-gateway
 
-# Install config file
+# Install configuration file
 sudo cp deploy/config/gateway.toml.example /etc/fluss-gateway/gateway.toml
 sudo vi /etc/fluss-gateway/gateway.toml
 # At minimum, change fluss.coordinator to your Fluss address
@@ -207,7 +207,7 @@ sudo systemctl status fluss-gateway
 sudo journalctl -u fluss-gateway -f
 ```
 
-### 3. Configuration File Reference
+### 3. Configuration File
 
 `/etc/fluss-gateway/gateway.toml`:
 
@@ -230,7 +230,7 @@ idle_timeout_secs = 600
 level = "info"  # "debug" | "info" | "warn" | "error"
 ```
 
-### 4. CLI Options
+### 4. CLI Arguments
 
 Priority: CLI args > config file > defaults.
 
@@ -238,22 +238,22 @@ Priority: CLI args > config file > defaults.
 fluss-gateway serve [OPTIONS]
 
 Options:
-      --host <HOST>                        Host to bind to
-      --port <PORT>                        Port to listen on
-      --fluss-coordinator <ADDR>           Fluss coordinator address
+      --host <HOST>                        Bind address
+      --port <PORT>                        Listen port
+      --fluss-coordinator <ADDR>           Fluss Coordinator address
       --auth-type <TYPE>                   Auth type: none | passthrough
-      --sasl-username <USER>               SASL username (fallback for "none" mode)
-      --sasl-password <PASS>               SASL password (fallback for "none" mode)
+      --sasl-username <USER>               SASL username (fallback for none mode)
+      --sasl-password <PASS>               SASL password (fallback for none mode)
       --config <PATH>                      Config file path
-      --pool-max-connections <N>           Max connections in the pool
-      --pool-idle-timeout-secs <N>         Idle timeout in seconds
+      --pool-max-connections <N>           Max connection pool size
+      --pool-idle-timeout-secs <N>         Connection idle timeout (seconds)
       --log-level <LEVEL>                  Log level: debug | info | warn | error
-  -h, --help                               Print help
+  -h, --help                               Print help information
 ```
 
 ---
 
-## Method 5: Lifecycle Management
+## Method 5: Operations Management
 
 ```bash
 ./bin/fluss-gateway.sh start -- --fluss-coordinator=localhost:9123  # Start in background
@@ -262,19 +262,19 @@ Options:
 ./bin/fluss-gateway.sh restart -- --fluss-coordinator=localhost:9123  # Restart
 ```
 
-PID file: `/tmp/fluss-gateway.pid` (customizable via `--pid-file=PATH`).
+PID file defaults to `/tmp/fluss-gateway.pid`, customizable via `--pid-file=PATH`.
 
 ### Graceful Shutdown
 
-On SIGTERM or SIGINT:
+After receiving SIGTERM/SIGINT signal:
 1. Stop accepting new requests
-2. Wait for in-flight requests to complete (up to 10s)
+2. Wait for existing requests to complete (up to 10 seconds)
 3. Close connection pool, clear cached Fluss connections
 4. Exit process
 
 ---
 
-## Verifying the Deployment
+## Verify Deployment
 
 ```bash
 # Health check
@@ -283,12 +283,12 @@ curl http://localhost:8080/health
 # Query databases
 curl http://localhost:8080/v1/_databases
 
-# Create a database
+# Create database
 curl -X POST http://localhost:8080/v1/_databases \
   -H 'Content-Type: application/json' \
   -d '{"database_name":"my_db","ignore_if_exists":true}'
 
-# Create a log table
+# Create log table
 curl -X POST http://localhost:8080/v1/my_db/_tables \
   -H 'Content-Type: application/json' \
   -d '{
@@ -330,7 +330,7 @@ sudo journalctl -u fluss-gateway -n 50 # View last 50 log lines
 ```bash
 docker compose up -d --force-recreate  # Recreate
 docker compose logs -f gateway         # View logs
-docker compose down                    # Stop and clean up
+docker compose down                    # Stop and cleanup
 ```
 
 ### Debug Mode
@@ -346,7 +346,7 @@ Docker: Add environment variable or mount a debug config file.
 | Issue | Cause | Solution |
 |-------|-------|----------|
 | `Connection refused` on 9123 | Fluss Coordinator not running or not exposed | Check Fluss cluster status |
-| `Exec format error` | Binary architecture mismatch (macOS binary on Linux) | Recompile on Linux or use Dockerfile.standalone |
-| Gateway exits immediately after start | Cannot connect to Fluss Coordinator | Verify `coordinator` address in config |
-| Health check returns ok but API fails | Fluss `advertised.listeners` misconfigured | Ensure the container can resolve the coordinator address |
+| `Exec format error` | Binary architecture mismatch (macOS build vs Linux run) | Rebuild on Linux or use Dockerfile.standalone |
+| Gateway exits immediately after start | Cannot connect to Fluss Coordinator | Check `coordinator` config address |
+| Health check returns ok but API fails | Fluss `advertised.listeners` config issue | Ensure coordinator address is resolvable from inside container |
 | `unknown subcommand 'server'` | Typo in command | Use `fluss-gateway serve` (not `server`) |

@@ -1,103 +1,104 @@
-# Fluss Gateway - Agent 约束规则
+# Fluss Gateway - Agent Constraints
 
-> 本文档定义了 agent 每次执行任务时**必须加载**的约束规则。
+> This document defines constraint rules that the agent **must load** before every task execution.
 
-## 项目基本信息
+## Project Information
 
-- **项目名称**: Fluss Gateway
-- **技术栈**: Rust + fluss-rust + DataFusion + Axum
-- **定位**: 基于 FIP-32 扩展的 Fluss REST API 网关，补充写入能力、流式消费和治理能力
-- **项目根目录**: `/Users/boyu/VscodeProjects/fluss-gateway`
-- **文档目录**: `docs/`
-- **调研目录**: `research/`
+- **Project Name**: Fluss Gateway
+- **Tech Stack**: Rust + fluss-rust + DataFusion + Axum
+- **Positioning**: Fluss REST API gateway extending FIP-32, adding write capabilities, streaming consumption, and governance
+- **Project Root**: `/Users/boyu/VscodeProjects/fluss-gateway`
+- **Documentation**: `docs/en/` (English default), `docs/cn/` (Chinese)
 
-## 认证方案 - 身份穿透
+## Authentication - Identity Passthrough
 
-Gateway 作为协议桥接器，不维护独立认证体系：
-- 客户端通过 HTTP Basic Auth 传递用户名/密码
-- Gateway 用该凭据通过 SASL/PLAIN 认证连接 Fluss
-- 权限控制完全在 Fluss 端（ZooKeeper ACL）
-- 配置：`[auth] type = "none" | "http_basic"`
+The gateway acts as a protocol bridge and does not maintain an independent auth system:
+- Clients pass username/password via HTTP Basic Auth
+- Gateway uses these credentials to connect to Fluss via SASL/PLAIN
+- Permission control is entirely on the Fluss side (ZooKeeper ACL)
+- Configuration: `[auth] type = "none" | "http_basic"`
 
-## 必须遵循的规则
+## Rules That Must Be Followed
 
-### 1. 代码规范
+### 1. Code Standards
 
-- 使用 Rust 2021 edition
-- 遵循 Rust 官方编码规范（rustfmt + clippy）
-- 所有公开 API 必须有文档注释（`///`）
-- 错误处理统一使用 `thiserror` 定义自定义错误类型
-- 异步代码使用 `tokio` 运行时
-- HTTP 框架使用 `axum`
+- Use Rust 2021 edition
+- Follow Rust official coding standards (rustfmt + clippy)
+- All public APIs must have documentation comments (`///`)
+- Error handling uses `thiserror` for custom error types
+- Async code uses `tokio` runtime
+- HTTP framework: `axum`
 
-### 2. 架构约束
+### 2. Architecture Constraints
 
-- 严格遵循四层架构：协议前端层 -> 查询引擎层 -> Service 层 -> Backend 层
-- 新增代码必须放在正确的层级模块中
-- `FlussBackend` trait 是后端抽象核心，所有 Fluss 操作通过它进行
-- Service 层封装业务逻辑，Controller/REST 层只做路由和序列化
+- Strictly follow the four-layer architecture: Protocol Frontend -> Query Engine -> Service Layer -> Backend Layer
+- New code must be placed in the correct layer module
+- `FlussBackend` trait is the core backend abstraction; all Fluss operations go through it
+- Service layer encapsulates business logic; Controller/REST layer handles routing and serialization only
 
-### 3. 设计原则
+### 3. Design Principles
 
-- **无状态消费**: 避免 Kafka REST 的有状态消费者陷阱
-- **连接池化**: 所有 Fluss 连接必须通过连接池管理
-- **全异步**: 所有 I/O 操作使用 `async/await`，返回 `CompletableFuture` 等效的 Rust Future
-- **错误码规范**: 遵循 `HTTP状态码 + 2位后缀` 模式（如 40401, 42901）
+- **Stateless consumption**: Avoid the stateful consumer trap of Kafka REST
+- **Connection pooling**: All Fluss connections must be managed through the connection pool
+- **Fully async**: All I/O operations use `async/await`, returning Rust Futures
+- **Error code convention**: Follow `HTTP Status Code + 2-digit suffix` pattern (e.g., 40401, 42901)
 
-### 4. 安全与治理
+### 4. Security & Governance
 
-- 认证采用身份穿透方案（HTTP Basic Auth -> SASL/PLAIN -> Fluss ACL）
-- 所有端点默认经过限流中间件
-- 写入路径必须经过四维限流检查
+- Authentication uses identity passthrough (HTTP Basic Auth -> SASL/PLAIN -> Fluss ACL)
+- All endpoints go through rate limiting middleware by default
+- Write path must pass four-dimensional rate limiting checks
 
-### 5. 测试要求
+### 5. Testing Requirements
 
-- 使用 `MockFlussBackend` 进行单元测试
-- 集成测试放在 `tests/` 目录
-- 新代码必须有对应的测试
+- Use `MockFlussBackend` for unit tests
+- Integration tests go in `tests/` directory
+- New code must have corresponding tests
 
-### 6. 依赖管理
+### 6. Dependency Management
 
-- 优先复用 FIP-32 已有组件（FlussBackend trait、DataFusion 集成、类型映射等）
-- 新增依赖需评估必要性和许可证
+- Prefer reusing existing FIP-32 components (FlussBackend trait, DataFusion integration, type mapping, etc.)
+- New dependencies must be evaluated for necessity and license
 
-## 关键参考路径
+## Key Reference Paths
 
-### 代码库
-| 资源 | 路径 |
-|------|------|
+### Codebases
+| Resource | Path |
+|----------|------|
 | Fluss (Java) | `~/IdeaProjects/fluss-community/` |
 | fluss-rust | `~/VscodeProjects/fluss-rust/` |
 | DataFusion | `~/VscodeProjects/datafusion/` |
 
-### Fluss 认证/鉴权
-| 资源 | 路径 |
-|------|------|
-| RPC 协议 | `~/IdeaProjects/fluss-community/fluss-rpc/src/main/proto/FlussApi.proto` |
-| 认证插件 | `~/IdeaProjects/fluss-community/fluss-common/src/main/java/.../security/auth/` |
+### Fluss Auth/Authz
+| Resource | Path |
+|----------|------|
+| RPC Protocol | `~/IdeaProjects/fluss-community/fluss-rpc/src/main/proto/FlussApi.proto` |
+| Auth Plugins | `~/IdeaProjects/fluss-community/fluss-common/src/main/java/.../security/auth/` |
 | SASL/PLAIN | `~/IdeaProjects/fluss-community/fluss-common/src/main/java/.../security/auth/sasl/authenticator/` |
-| ACL 鉴权 | `~/IdeaProjects/fluss-community/fluss-server/src/main/java/.../server/authorizer/` |
+| ACL Authz | `~/IdeaProjects/fluss-community/fluss-server/src/main/java/.../server/authorizer/` |
 | FlussPrincipal | `~/IdeaProjects/fluss-community/fluss-common/src/main/java/.../security/acl/FlussPrincipal.java` |
 
-### fluss-rust 客户端
-| 资源 | 路径 |
-|------|------|
-| 客户端入口 | `~/VscodeProjects/fluss-rust/crates/fluss/src/client/` |
-| 连接管理 | `~/VscodeProjects/fluss-rust/crates/fluss/src/client/connection.rs` |
-| 写入路径 | `~/VscodeProjects/fluss-rust/crates/fluss/src/client/write/` |
-| 表扫描 | `~/VscodeProjects/fluss-rust/crates/fluss/src/client/table/scanner.rs` |
+### fluss-rust Client
+| Resource | Path |
+|----------|------|
+| Client Entry | `~/VscodeProjects/fluss-rust/crates/fluss/src/client/` |
+| Connection Mgmt | `~/VscodeProjects/fluss-rust/crates/fluss/src/client/connection.rs` |
+| Write Path | `~/VscodeProjects/fluss-rust/crates/fluss/src/client/write/` |
+| Table Scan | `~/VscodeProjects/fluss-rust/crates/fluss/src/client/table/scanner.rs` |
 
-### 调研文档
-| 资源 | 路径 |
-|------|------|
-| FIP 设计文档 | `~/AiWorkSpace/fluss-fip/FIP-REST-API/fluss-gateway-design.md` |
-| Kafka REST 调研 | `research/kafka-rest-proxy-gateway-research.md` |
-| Kafka REST 源码 | `research/kafka-rest-source-code-analysis.md` |
+### Design Documents
+| Resource | Path |
+|----------|------|
+| FIP Design Doc | `~/AiWorkSpace/fluss-fip/FIP-REST-API/fluss-gateway-design.md` |
+| Architecture | `docs/en/ARCHITECTURE.md` |
+| API Design | `docs/en/API.md` |
+| Project Progress | `docs/en/PROGRESS.md` |
 
-## 按需加载文档
+## Load Documentation On Demand
 
-以下文档在**规划和方案设计阶段**按需加载：
+The following documents should be loaded as needed during **planning and design phases**:
 
-- `docs/ARCHITECTURE.md` - 架构设计详情
-- `docs/API.md` - API 设计详情
-- `~/AiWorkSpace/fluss-fip/FIP-REST-API/fluss-gateway-design.md` - FIP 完整设计
+- `docs/en/ARCHITECTURE.md` - Architecture design details
+- `docs/en/API.md` - API design details
+- `docs/en/PROGRESS.md` - Project progress tracking
+- `~/AiWorkSpace/fluss-fip/FIP-REST-API/fluss-gateway-design.md` - FIP complete design

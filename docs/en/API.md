@@ -1,6 +1,6 @@
 # Fluss Gateway API Documentation
 
-Base URL: `http://localhost:8080`. All requests and responses are JSON.
+Base URL: `http://localhost:8080`. All requests and responses use JSON.
 
 ---
 
@@ -56,26 +56,26 @@ GET /v1/{db}/{table}/_info
 }
 ```
 
-**Fields:**
+**Field descriptions:**
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `table_id` | integer | Internal Fluss table ID |
-| `columns` | array | Column definitions (name + data type) |
-| `has_primary_key` | boolean | Whether the table has a primary key |
+| `table_id` | integer | Fluss internal table ID |
+| `columns` | array | Column definitions (column name + data type) |
+| `has_primary_key` | boolean | Whether this is a primary key table |
 | `num_buckets` | integer | Number of buckets |
 
 ---
 
 ## 3. Read Operations
 
-### 3.1 Point Lookup
+### 3.1 Primary Key Point Lookup
 
 ```
 GET /v1/{db}/{table}?pk.{col}={value}
 ```
 
-Look up records by primary key. Supports composite keys via multiple `pk.{col}` params.
+Query by primary key. Supports composite keys (multiple `pk.{col}` parameters).
 
 **Response:**
 ```json
@@ -84,9 +84,9 @@ Look up records by primary key. Supports composite keys via multiple `pk.{col}` 
 
 **Errors:**
 - Non-PK table → `400xx`
-- Missing PK column → `400xx`
+- Missing PK columns → `400xx`
 
-### 3.2 Batch Lookup
+### 3.2 Batch Primary Key Lookup
 
 ```
 POST /v1/{db}/{table}/batch
@@ -121,8 +121,8 @@ POST /v1/{db}/{table}/scan
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `timeout_ms` | int | 5000 | Poll timeout in milliseconds |
-| `limit` | int | unlimited | Max rows to return |
+| `timeout_ms` | int | 5000 | Poll timeout (milliseconds) |
+| `limit` | int | none | Maximum rows to return |
 | `projection` | array | all columns | Return only specified columns |
 
 ---
@@ -133,12 +133,12 @@ POST /v1/{db}/{table}/scan
 POST /v1/{db}/{table}/rows
 ```
 
-Automatically routes based on table type:
+Auto-routes based on table type:
 
-| Table type | Operation |
+| Table Type | Operation |
 |------------|-----------|
 | Log table (no PK) | append |
-| PK table | upsert |
+| Primary key table | upsert |
 | PK table + `change_type: "Delete"` | delete |
 
 **Request body:**
@@ -151,7 +151,7 @@ Automatically routes based on table type:
 }
 ```
 
-**Delete (PK table only):**
+**Delete (PK tables only):**
 ```json
 {
   "rows": [
@@ -164,8 +164,8 @@ Automatically routes based on table type:
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `values` | array | yes | Values in column order |
-| `change_type` | string | no | Set to `"Delete"` for deletion |
+| `values` | array | yes | Value array in table column order |
+| `change_type` | string | no | Set to `"Delete"` to perform deletion |
 
 **Response:** `{ "row_count": 2 }`
 
@@ -173,17 +173,17 @@ Automatically routes based on table type:
 
 ## 5. Error Format
 
-All errors:
+All errors follow a unified format:
 ```json
 { "error_code": 40001, "message": "missing pk column: user_id" }
 ```
 
-Error code: `<HTTP status><2-digit suffix>`.
+Error code format: `<HTTP status code><2-digit suffix>`.
 
-| Error | HTTP | Description |
-|-------|------|-------------|
-| `400xx` | 400 | Bad request |
-| `401xx` | 401 | Unauthorized (missing credentials in passthrough mode) |
+| Error Code | HTTP Status | Description |
+|------------|-------------|-------------|
+| `400xx` | 400 | Request parameter error |
+| `401xx` | 401 | Not authenticated (missing credentials in passthrough mode) |
 | `404xx` | 404 | Resource not found |
 | `500xx` | 500 | Internal error |
 
@@ -193,8 +193,8 @@ Error code: `<HTTP status><2-digit suffix>`.
 
 | Mode | Description |
 |------|-------------|
-| `none` (default) | All requests share static startup credentials |
-| `passthrough` | Each request must include HTTP Basic Auth; credentials passed to Fluss via SASL/PLAIN for ACL enforcement |
+| `none` (default) | All requests share static credentials set at startup |
+| `passthrough` | Each request carries HTTP Basic Auth; credentials passed to Fluss via SASL/PLAIN for ACL enforcement |
 
 ```bash
 curl -u username:password http://localhost:8080/v1/_databases
