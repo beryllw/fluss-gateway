@@ -1,12 +1,12 @@
 # Fluss Gateway 架构设计
 
-> 基于 FIP-32（多协议查询网关）的扩展设计，补充写入能力和 Kafka REST Proxy 工程经验。
+> 基于 FIP-32(多协议查询网关)的扩展设计,补充写入能力和 Kafka REST Proxy 工程经验。
 
 ## 背景与定位
 
 ### FIP-32 概述
 
-FIP-32 提出了一个**多协议查询网关**：基于 `fluss-rust` + DataFusion 的只读 Rust 服务，通过四种协议暴露 Fluss 表：
+FIP-32 提出了一个**多协议查询网关**:基于 `fluss-rust` + DataFusion 的只读 Rust 服务,通过四种协议暴露 Fluss 表:
 - Arrow Flight SQL (9093)
 - PostgreSQL 有线协议 (5432)
 - gRPC API (9094)
@@ -14,7 +14,7 @@ FIP-32 提出了一个**多协议查询网关**：基于 `fluss-rust` + DataFusi
 
 ### 本方案与 FIP-32 的关系
 
-| 维度 | FIP-32（查询网关） | 本方案（REST Gateway 扩展） |
+| 维度 | FIP-32(查询网关) | 本方案(REST Gateway 扩展) |
 |------|-------------------|--------------------------|
 | 范围 | 只读 | 只读 + **写入** |
 | REST API | 简单路径 `/v1/{db}/{table}` | 完整 CRUD + 流式消费 |
@@ -36,7 +36,7 @@ FIP-32 提出了一个**多协议查询网关**：基于 `fluss-rust` + DataFusi
 |  +-----+-----+  +-----+-----+  +-----+-----+  +-------+--------+ |
 |        |              |              |                |           |
 |  +-----+--------------+--------------+----------------+--------+ |
-|  |              DataFusion (SQL 查询引擎，只读路径)              | |
+|  |              DataFusion (SQL 查询引擎,只读路径)              | |
 |  +-----+--------------+--------------+----------------+--------+ |
 |        |              |              |                |           |
 |  +-----+--------------+--------------+----------------+--------+ |
@@ -60,10 +60,10 @@ FIP-32 提出了一个**多协议查询网关**：基于 `fluss-rust` + DataFusi
 
 ## 四层架构
 
-1. **协议前端层** - FIP-32 已有四种协议，本方案重点扩展 REST/HTTP 和 gRPC
-2. **查询引擎层** (DataFusion) - FIP-32 已有，处理 SQL 查询
-3. **Service 层** - 本方案新增，处理写入、流式消费、治理逻辑
-4. **Backend 层** - FIP-32 已有 `FlussBackend` trait，本方案扩展写入方法
+1. **协议前端层** - FIP-32 已有四种协议,本方案重点扩展 REST/HTTP 和 gRPC
+2. **查询引擎层** (DataFusion) - FIP-32 已有,处理 SQL 查询
+3. **Service 层** - 本方案新增,处理写入、流式消费、治理逻辑
+4. **Backend 层** - FIP-32 已有 `FlussBackend` trait,本方案扩展写入方法
 
 ## 项目结构
 
@@ -75,7 +75,7 @@ fluss-query-gateway/
 ├── proto/
 │   └── gateway.proto                # gRPC 服务定义
 ├── src/
-│   ├── backend/                     # FIP-32 已有，需扩展写入
+│   ├── backend/                     # FIP-32 已有,需扩展写入
 │   │   ├── mod.rs                   # FlussBackend trait
 │   │   ├── native.rs                # NativeFlussBackend
 │   │   ├── mock.rs                  # MockFlussBackend
@@ -97,8 +97,8 @@ fluss-query-gateway/
 │   │   ├── mod.rs
 │   │   ├── flight_sql.rs            # Arrow Flight SQL 服务器
 │   │   ├── postgres.rs              # PostgreSQL 有线协议服务器
-│   │   ├── grpc.rs                  # gRPC 服务器（扩展写入）
-│   │   └── rest/                    # REST 服务器（重点扩展）
+│   │   ├── grpc.rs                  # gRPC 服务器(扩展写入)
+│   │   └── rest/                    # REST 服务器(重点扩展)
 │   │       ├── mod.rs               # 路由组装
 │   │       ├── health.rs            # /health
 │   │       ├── metadata.rs          # /v1/_databases, /v1/{db}/_tables
@@ -204,56 +204,56 @@ pub trait FlussBackend: Send + Sync {
 |-------------|------------------------|
 | 有状态消费者 | 无状态 Scan API + 长连接流式消费 |
 | 连接不池化 | FlussConnection 连接池 (DashMap<NodeId, Connection>) |
-| 消费者内存泄漏 | 无持久消费者注册表，WS 断开自动清理 |
+| 消费者内存泄漏 | 无持久消费者注册表,WS 断开自动清理 |
 | 限流覆盖不全 | 全端点 Tower 限流 + Produce 四维限流 |
-| 错误处理不一致 | 统一 GatewayError 类型，实现 IntoResponse |
+| 错误处理不一致 | 统一 GatewayError 类型,实现 IntoResponse |
 | 单点 Producer | 使用 fluss-rust WriterClient (内部已有 Sender + RecordAccumulator) |
 
 ## 分阶段实施计划
 
 ### Phase 1: 基础框架 + 读取 (当前)
 - 在 `fluss-query-gateway/` 中搭建项目结构
-- 复用 FIP-32 已有的 `FlussBackend` trait（只读方法已实现）
+- 复用 FIP-32 已有的 `FlussBackend` trait(只读方法已实现)
 - 实现连接池管理 `ConnectionPool`
-- 复用 FIP-32 已有的 REST 读取端点（KV 点查、前缀扫描、日志表扫描）
-- **交付物**: 可编译，支持通过 REST API 读取 Fluss 数据
+- 复用 FIP-32 已有的 REST 读取端点(KV 点查、前缀扫描、日志表扫描)
+- **交付物**: 可编译,支持通过 REST API 读取 Fluss 数据
 
 ### Phase 2: 写入路径 (核心)
 - 扩展 `FlussBackend` trait 增加 `append_rows` / `upsert_rows` 方法
-- 实现 `NativeFlussBackend` 的写入路径（基于 fluss-rust WriterClient）
-- 实现 `ProduceService`（写入服务，封装 WriterClient）
-- JSON 反序列化器（values -> Fluss Row）
+- 实现 `NativeFlussBackend` 的写入路径(基于 fluss-rust WriterClient)
+- 实现 `ProduceService`(写入服务,封装 WriterClient)
+- JSON 反序列化器(values -> Fluss Row)
 - Arrow IPC 反序列化
-- 根据表类型自动路由（LOG 表 -> append，PK 表 -> upsert）
-- REST 端点：`POST /v1/{db}/{table}/rows`
+- 根据表类型自动路由(LOG 表 -> append,PK 表 -> upsert)
+- REST 端点:`POST /v1/{db}/{table}/rows`
 - **交付物**: 完整的写入 API
 
 ### Phase 3: 认证 - 身份穿透 (安全)
-- Gateway 作为协议桥接器，不维护独立认证体系
+- Gateway 作为协议桥接器,不维护独立认证体系
 - 客户端通过 HTTP Basic Auth 传递用户名/密码
 - Gateway 用该凭据通过 SASL/PLAIN 认证连接 Fluss
-- 权限控制完全在 Fluss 端（ZooKeeper ACL）
-- 配置：`[auth] type = "none" | "http_basic"`
+- 权限控制完全在 Fluss 端(ZooKeeper ACL)
+- 配置:`[auth] type = "none" | "http_basic"`
 - **交付物**: 身份穿透中间件 + 配置
 
 ### Phase 4: 完善与测试
 - 使用 `MockFlussBackend` 补充写入单元测试
-- 集成测试（读写端到端验证）
+- 集成测试(读写端到端验证)
 - 错误码体系完善
 - **交付物**: 可发布的读写 + 认证 Gateway
 
 ---
 
-## 延后事项（后续迭代）
+## 延后事项(后续迭代)
 
 | 事项 | 原因 |
 |------|------|
-| 流式消费（WebSocket/SSE） | 非核心需求，读写优先 |
-| 元数据管理（DB/Table CRUD） | 非核心需求 |
-| 限流（Tier 1 + Tier 2） | 后续生产环境需要时添加 |
+| 流式消费(WebSocket/SSE) | 非核心需求,读写优先 |
+| 元数据管理(DB/Table CRUD) | 非核心需求 |
+| 限流(Tier 1 + Tier 2) | 后续生产环境需要时添加 |
 | Prometheus 指标 | 后续监控需要时添加 |
 | 审计日志 | 后续合规需要时添加 |
-| gRPC 写入扩展 | REST 优先，gRPC 后续 |
+| gRPC 写入扩展 | REST 优先,gRPC 后续 |
 
 ---
 
@@ -263,16 +263,16 @@ pub trait FlussBackend: Send + Sync {
 
 | 模块 | 关键路径 | 用途 |
 |------|---------|------|
-| fluss-rpc | `fluss-rpc/src/main/proto/FlussApi.proto` | RPC 协议定义（含 AuthenticateRequest/Response） |
+| fluss-rpc | `fluss-rpc/src/main/proto/FlussApi.proto` | RPC 协议定义(含 AuthenticateRequest/Response) |
 | fluss-rpc | `fluss-rpc/src/main/java/.../rpc/netty/server/NettyServerHandler.java` | 认证握手流程 |
 | fluss-rpc | `fluss-rpc/src/main/java/.../rpc/netty/client/NettyClient.java` | 客户端认证流程 |
 | fluss-rpc | `fluss-rpc/src/main/java/.../rpc/netty/server/Session.java` | Session 封装 FlussPrincipal |
-| fluss-common | `fluss-common/src/main/java/.../security/auth/` | 认证插件体系（SPI） |
+| fluss-common | `fluss-common/src/main/java/.../security/auth/` | 认证插件体系(SPI) |
 | fluss-common | `fluss-common/src/main/java/.../security/auth/sasl/authenticator/` | SASL/PLAIN 实现 |
 | fluss-common | `fluss-common/src/main/java/.../security/acl/FlussPrincipal.java` | Principal 定义 |
-| fluss-server | `fluss-server/src/main/java/.../server/authorizer/` | ACL 鉴权（DefaultAuthorizer） |
+| fluss-server | `fluss-server/src/main/java/.../server/authorizer/` | ACL 鉴权(DefaultAuthorizer) |
 | fluss-client | `fluss-client/src/main/java/.../client/` | Java 客户端入口 |
-| fluss-client | `fluss-client/src/main/java/.../client/connection.rs` | FlussConnection（Rust 对应参考） |
+| fluss-client | `fluss-client/src/main/java/.../client/connection.rs` | FlussConnection(Rust 对应参考) |
 | fluss-client | `fluss-client/src/main/java/.../client/admin.rs` | FlussAdmin 元数据操作 |
 | fluss-client | `fluss-client/src/main/java/.../client/table/scanner.rs` | LogScanner 消费原语 |
 | fluss-client | `fluss-client/src/main/java/.../client/write/` | WriterClient 写入路径 |
@@ -293,7 +293,7 @@ pub trait FlussBackend: Send + Sync {
 | 模块 | 关键路径 | 用途 |
 |------|---------|------|
 | core | `datafusion/core/` | DataFusion 核心引擎 |
-| catalog | `datafusion/core/src/catalog/` | Catalog 抽象（FIP-32 用此扩展 FlussCatalog） |
+| catalog | `datafusion/core/src/catalog/` | Catalog 抽象(FIP-32 用此扩展 FlussCatalog) |
 | execution | `datafusion/core/src/execution/` | 执行引擎 |
-| physical-plan | `datafusion/core/src/physical_plan/` | 物理执行计划（FIP-32 自定义 ExecutionPlan 参考） |
+| physical-plan | `datafusion/core/src/physical_plan/` | 物理执行计划(FIP-32 自定义 ExecutionPlan 参考) |
 | examples | `datafusion-examples/` | 使用示例 |
