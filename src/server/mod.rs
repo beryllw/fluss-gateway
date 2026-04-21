@@ -136,10 +136,7 @@ impl GatewayServer {
             .route("/health", get(rest::health))
             .route("/metrics", get(metrics::metrics_handler))
             .merge(api)
-            .merge(
-                SwaggerUi::new("/swagger-ui")
-                    .url("/api-doc/openapi.json", openapi),
-            )
+            .merge(SwaggerUi::new("/swagger-ui").url("/api-doc/openapi.json", openapi))
             .with_state(shared)
     }
 }
@@ -317,11 +314,12 @@ mod tests {
 
     #[tokio::test]
     async fn test_get_request_bypasses_limit() {
-        let app = Router::new()
-            .route("/echo", get(|| async { "ok" }))
-            .layer(axum::middleware::from_fn(move |req, next| {
-                body_limit_middleware(req, next, 1)
-            }));
+        let app =
+            Router::new()
+                .route("/echo", get(|| async { "ok" }))
+                .layer(axum::middleware::from_fn(move |req, next| {
+                    body_limit_middleware(req, next, 1)
+                }));
 
         let request = http::Request::builder()
             .method(Method::GET)
@@ -329,9 +327,10 @@ mod tests {
             .body(axum::body::Body::empty())
             .unwrap();
 
-        let response: http::Response<_> = ServiceExt::<http::Request<axum::body::Body>>::oneshot(app, request)
-            .await
-            .unwrap();
+        let response: http::Response<_> =
+            ServiceExt::<http::Request<axum::body::Body>>::oneshot(app, request)
+                .await
+                .unwrap();
 
         assert_eq!(response.status(), 200);
     }

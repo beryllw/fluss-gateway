@@ -105,14 +105,15 @@ pub async fn health(
 }
 
 /// Check Fluss connectivity and circuit breaker status
-async fn check_fluss_health(
-    state: &AppState,
-) -> (Result<(), GatewayError>, HealthStatus) {
+async fn check_fluss_health(state: &AppState) -> (Result<(), GatewayError>, HealthStatus) {
     let circuit_status = state.circuit_breaker.health().await;
 
     // If circuit is open, don't attempt the check
     if circuit_status == HealthStatus::Unhealthy {
-        return (Err(GatewayError::Internal("circuit breaker is open".into())), circuit_status);
+        return (
+            Err(GatewayError::Internal("circuit breaker is open".into())),
+            circuit_status,
+        );
     }
 
     // Attempt a lightweight health check

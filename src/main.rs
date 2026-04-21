@@ -3,8 +3,8 @@ mod backend;
 mod config;
 mod metrics;
 mod pool;
-mod server;
 mod resilience;
+mod server;
 mod types;
 
 use std::path::Path;
@@ -132,9 +132,11 @@ async fn main() -> anyhow::Result<()> {
                 .init();
 
             // Initialize Prometheus metrics recorder
-            metrics::PrometheusRecorder::install().map_err(|e| {
-                tracing::warn!(error = %e, "failed to initialize metrics recorder");
-            }).ok();
+            metrics::PrometheusRecorder::install()
+                .map_err(|e| {
+                    tracing::warn!(error = %e, "failed to initialize metrics recorder");
+                })
+                .ok();
             tracing::info!("prometheus metrics recorder initialized");
 
             let addr = format!("{}:{}", config.server.host, config.server.port);

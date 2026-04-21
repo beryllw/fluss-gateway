@@ -10,7 +10,8 @@ pub struct PrometheusRecorder;
 
 impl PrometheusRecorder {
     pub fn install() -> Result<&'static Self, Box<dyn std::error::Error + Send + Sync>> {
-        let recorder_handle = metrics_exporter_prometheus::PrometheusBuilder::new().install_recorder()?;
+        let recorder_handle =
+            metrics_exporter_prometheus::PrometheusBuilder::new().install_recorder()?;
         RECORDER.get_or_init(|| recorder_handle);
         Ok(&PROMETHEUS_RECORDER)
     }
@@ -29,7 +30,10 @@ pub fn scrape_metrics() -> String {
 pub async fn metrics_handler() -> impl IntoResponse {
     let metrics = scrape_metrics();
     (
-        [(axum::http::header::CONTENT_TYPE, "text/plain; version=0.0.4; charset=utf-8")],
+        [(
+            axum::http::header::CONTENT_TYPE,
+            "text/plain; version=0.0.4; charset=utf-8",
+        )],
         metrics,
     )
 }
@@ -110,8 +114,14 @@ mod tests {
 
     #[test]
     fn test_normalize_path_api_routes() {
-        assert_eq!(normalize_path("/v1/mydb/mytable/rows"), "/v1/{db}/{table}/rows");
-        assert_eq!(normalize_path("/v1/mydb/mytable/scan"), "/v1/{db}/{table}/scan");
+        assert_eq!(
+            normalize_path("/v1/mydb/mytable/rows"),
+            "/v1/{db}/{table}/rows"
+        );
+        assert_eq!(
+            normalize_path("/v1/mydb/mytable/scan"),
+            "/v1/{db}/{table}/scan"
+        );
         assert_eq!(normalize_path("/v1/mydb/mytable"), "/v1/{db}/{table}");
         assert_eq!(normalize_path("/v1/_databases"), "/v1/_databases");
         assert_eq!(normalize_path("/v1/mydb/_tables"), "/v1/{db}/_tables");
@@ -125,6 +135,9 @@ mod tests {
 
     #[test]
     fn test_normalize_path_with_query() {
-        assert_eq!(normalize_path("/v1/mydb/mytable/rows?format=arrow"), "/v1/{db}/{table}/rows");
+        assert_eq!(
+            normalize_path("/v1/mydb/mytable/rows?format=arrow"),
+            "/v1/{db}/{table}/rows"
+        );
     }
 }

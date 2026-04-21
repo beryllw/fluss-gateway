@@ -231,7 +231,9 @@ where
 
                 // Exponential backoff with jitter
                 backoff = std::cmp::min(
-                    Duration::from_secs_f64(backoff.as_secs_f64() * retry_config.backoff_multiplier),
+                    Duration::from_secs_f64(
+                        backoff.as_secs_f64() * retry_config.backoff_multiplier,
+                    ),
                     retry_config.max_backoff,
                 );
 
@@ -329,7 +331,7 @@ mod tests {
 
         let call_count = std::sync::Arc::new(std::sync::atomic::AtomicU32::new(0));
         let call_count_clone = call_count.clone();
-        
+
         let result = execute_with_retry(&cb, &config, move || {
             let count = call_count_clone.clone();
             async move {
