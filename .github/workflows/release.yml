@@ -8,7 +8,7 @@ on:
     inputs:
       version:
         description: 'Release version (e.g. v0.1.0)'
-        required: false
+        required: true
         type: string
 
 jobs:
@@ -153,7 +153,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           name: Fluss Gateway ${{ github.ref_name || inputs.version }}
-          tag_name: ${{ github.ref_name || inputs.version }}
+          tag_name: ${{ inputs.version || github.ref_name }}
           draft: true
           generate_release_notes: true
           files: |
