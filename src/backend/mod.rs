@@ -34,6 +34,16 @@ impl FlussBackend {
         })
     }
 
+    /// Check connectivity to the Fluss Coordinator by attempting a lightweight
+    /// metadata operation (list_databases). Returns Ok(()) if the connection
+    /// is functional, Err(_) if the coordinator is unreachable or unresponsive.
+    pub async fn check_health(&self) -> Result<(), GatewayError> {
+        let conn = self.conn(None).await?;
+        let admin = conn.get_admin().map_err(fluss_err)?;
+        admin.list_databases().await.map_err(fluss_err)?;
+        Ok(())
+    }
+
     /// Get a FlussConnection for the given credentials. When `creds` is `None`,
     /// uses the startup credentials configured for the backend.
     async fn conn(

@@ -19,7 +19,7 @@ pub struct ConnectionPool {
 impl ConnectionPool {
     pub fn new(coordinator: &str, auth: AuthConfig, pool: PoolConfig) -> Self {
         let cache: Cache<CredentialKey, Arc<FlussConnection>> = Cache::builder()
-            .max_capacity(pool.max_connections)
+            .max_capacity(pool.max_connections as u64)
             .time_to_idle(std::time::Duration::from_secs(pool.idle_timeout_secs))
             .build();
 

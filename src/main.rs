@@ -1,6 +1,9 @@
+mod api_doc;
 mod backend;
 mod config;
+mod metrics;
 mod pool;
+mod resilience;
 mod server;
 mod types;
 
@@ -48,7 +51,7 @@ struct ServeArgs {
 
     /// Pool max connections
     #[arg(long)]
-    pool_max_connections: Option<u64>,
+    pool_max_connections: Option<u32>,
 
     /// Pool idle timeout in seconds
     #[arg(long)]
@@ -127,6 +130,14 @@ async fn main() -> anyhow::Result<()> {
                         .add_directive(format!("fluss_gateway={}", config.log.level).parse()?),
                 )
                 .init();
+
+            // Initialize Prometheus metrics recorder
+            metrics::PrometheusRecorder::install()
+                .map_err(|e| {
+                    tracing::warn!(error = %e, "failed to initialize metrics recorder");
+                })
+                .ok();
+            tracing::info!("prometheus metrics recorder initialized");
 
             let addr = format!("{}:{}", config.server.host, config.server.port);
 
