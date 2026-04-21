@@ -1,7 +1,8 @@
 pub(crate) mod auth;
-mod rest;
+pub(crate) mod rest;
 
 use std::sync::Arc;
+use std::time::Instant;
 
 use axum::{
     extract::Request,
@@ -11,9 +12,14 @@ use axum::{
     routing::{delete, get, post, put},
     Router,
 };
+use utoipa::OpenApi;
+use utoipa_swagger_ui::SwaggerUi;
 
+use crate::api_doc::ApiDoc;
 use crate::backend::FlussBackend;
 use crate::config::GatewayConfig;
+use crate::metrics;
+use crate::resilience::{CircuitBreaker, CircuitBreakerConfig, RetryConfig};
 
 /// Wait for SIGINT or SIGTERM and return, triggering graceful shutdown.
 async fn shutdown_signal() {
@@ -45,6 +51,8 @@ async fn shutdown_signal() {
 pub struct GatewayServer {
     backend: Arc<FlussBackend>,
     config: GatewayConfig,
+    circuit_breaker: Arc<CircuitBreaker>,
+    retry_config: RetryConfig,
 }
 
 impl GatewayServer {
@@ -55,9 +63,15 @@ impl GatewayServer {
             config.pool.clone(),
         )
         .await?;
+
+        let circuit_breaker = Arc::new(CircuitBreaker::new(CircuitBreakerConfig::default()));
+        let retry_config = RetryConfig::default();
+
         Ok(Self {
             backend: Arc::new(backend),
             config,
+            circuit_breaker,
+            retry_config,
         })
     }
 
@@ -89,6 +103,7 @@ impl GatewayServer {
         let shared = AppState {
             backend: self.backend.clone(),
             auth_type: self.config.auth.r#type.clone(),
+            circuit_breaker: self.circuit_breaker.clone(),
         };
 
         let api = Router::new()
@@ -97,9 +112,9 @@ impl GatewayServer {
             .route("/v1/_databases/{db}", delete(rest::drop_database))
             .route("/v1/{db}/_tables", get(rest::list_tables))
             .route("/v1/{db}/_tables", post(rest::create_table))
-            .route("/v1/{db}/_tables/{table}", put(rest::table_info))
+            .route("/v1/{db}/_tables/{table}", put(rest::table_info_put))
             .route("/v1/{db}/_tables/{table}", delete(rest::drop_table))
-            .route("/v1/{db}/{table}/_info", get(rest::table_info))
+            .route("/v1/{db}/{table}/_info", get(rest::table_info_get))
             .route("/v1/{db}/{table}", get(rest::lookup))
             .route("/v1/{db}/{table}/prefix", get(rest::prefix_scan))
             .route("/v1/{db}/{table}/batch", post(rest::batch_lookup))
@@ -107,13 +122,25 @@ impl GatewayServer {
             .route("/v1/{db}/{table}/rows", post(rest::produce))
             .route("/v1/{db}/{table}/offsets", post(rest::list_offsets))
             .route("/v1/{db}/{table}/partitions", get(rest::list_partitions))
-            .with_state(shared)
+            .with_state(shared.clone())
             .layer(axum::middleware::from_fn(move |req, next| {
                 body_limit_middleware(req, next, max_body_size)
             }))
-            .layer(axum::middleware::from_fn(auth_middleware));
+            .layer(axum::middleware::from_fn(auth_middleware))
+            .layer(axum::middleware::from_fn(metrics_middleware));
 
-        Router::new().route("/health", get(rest::health)).merge(api)
+        // Build the OpenAPI spec and add Swagger UI
+        let openapi = ApiDoc::openapi();
+
+        Router::<AppState>::new()
+            .route("/health", get(rest::health))
+            .route("/metrics", get(metrics::metrics_handler))
+            .merge(api)
+            .merge(
+                SwaggerUi::new("/swagger-ui")
+                    .url("/api-doc/openapi.json", openapi),
+            )
+            .with_state(shared)
     }
 }
 
@@ -121,13 +148,13 @@ impl GatewayServer {
 pub struct AppState {
     pub backend: Arc<FlussBackend>,
     pub auth_type: crate::config::AuthType,
+    pub circuit_breaker: Arc<CircuitBreaker>,
 }
 
 /// Middleware that checks the Content-Length of POST/PUT requests against
 /// the configured max body size. Returns HTTP 413 with a structured error
 /// JSON and the `X-Gateway-Max-Body-Size` header when the limit is exceeded.
 async fn body_limit_middleware(req: Request, next: Next, max_body_size: usize) -> Response {
-    // Only enforce limits on methods that carry a request body
     if *req.method() == Method::POST || *req.method() == Method::PUT {
         if let Some(cl) = req.headers().get(axum::http::header::CONTENT_LENGTH) {
             if let Ok(len) = cl.to_str() {
@@ -165,6 +192,33 @@ async fn auth_middleware(req: Request, next: Next) -> Response {
     next.run(req).await
 }
 
+/// Metrics middleware: collects request counts, duration, and error rates.
+async fn metrics_middleware(req: Request, next: Next) -> Response {
+    let method = req.method().clone();
+    let uri = req.uri().path().to_string();
+    let start = Instant::now();
+
+    let response = next.run(req).await;
+
+    let duration = start.elapsed().as_secs_f64();
+    let status = response.status().as_u16();
+    let normalized_path = metrics::normalize_path(&uri);
+
+    metrics::record_http_request(method.as_str(), &normalized_path, status);
+    metrics::record_http_request_duration(method.as_str(), &normalized_path, duration);
+
+    if status >= 400 {
+        let error_type = if status >= 500 {
+            "server_error"
+        } else {
+            "client_error"
+        };
+        metrics::record_error(error_type);
+    }
+
+    response
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -172,17 +226,14 @@ mod tests {
     use axum::http::StatusCode;
     use axum::routing::post;
     use axum::Json;
-    use axum::Router;
     use http_body_util::BodyExt;
     use serde_json::json;
     use tower::ServiceExt;
 
-    /// A stub handler that echoes back the body size it received.
     async fn echo_size(Json(body): Json<serde_json::Value>) -> Json<serde_json::Value> {
         Json(json!({ "received": body }))
     }
 
-    /// Build a test router with a configurable body limit.
     fn test_app(limit: usize) -> Router {
         Router::new()
             .route("/echo", post(echo_size))
@@ -258,7 +309,6 @@ mod tests {
 
     #[tokio::test]
     async fn test_body_exactly_at_limit_passes() {
-        // Payload "{\"hello\":\"world\"}" = 18 bytes, Content-Length will be 18
         let app = test_app(18);
         let payload = json!({"hello":"world"}).to_string();
         let (status, _, _) = call(app, Method::POST, "/echo", Some(payload)).await;
@@ -268,18 +318,18 @@ mod tests {
     #[tokio::test]
     async fn test_get_request_bypasses_limit() {
         let app = Router::new()
-            .route("/health", get(crate::server::rest::health))
+            .route("/echo", get(|| async { "ok" }))
             .layer(axum::middleware::from_fn(move |req, next| {
-                body_limit_middleware(req, next, 1) // 1 byte limit, GET should bypass
+                body_limit_middleware(req, next, 1)
             }));
 
         let request = http::Request::builder()
             .method(Method::GET)
-            .uri("/health")
+            .uri("/echo")
             .body(axum::body::Body::empty())
             .unwrap();
 
-        let response = ServiceExt::<http::Request<axum::body::Body>>::oneshot(app, request)
+        let response: http::Response<_> = ServiceExt::<http::Request<axum::body::Body>>::oneshot(app, request)
             .await
             .unwrap();
 

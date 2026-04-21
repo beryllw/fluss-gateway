@@ -2,6 +2,7 @@ use fluss::row::Datum;
 use ordered_float::OrderedFloat;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use utoipa::ToSchema;
 
 // === Request/Response DTOs ===
 
@@ -22,119 +23,157 @@ impl LookupParams {
 }
 
 /// Scan parameters (JSON body)
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, ToSchema)]
 pub struct ScanParams {
+    /// Column indices to include in the result
     pub projection: Option<Vec<usize>>,
+    /// Maximum number of rows to return
     pub limit: Option<usize>,
+    /// Request timeout in milliseconds
     pub timeout_ms: Option<u64>,
 }
 
 /// Write result response
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, ToSchema)]
 pub struct WriteResult {
+    /// Number of rows affected
     pub row_count: usize,
 }
 
 /// Produce request body
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ToSchema)]
 pub struct ProduceRequest {
-    #[allow(dead_code)]
+    /// Data format (optional)
     pub format: Option<String>,
+    /// Rows to write
     pub rows: Vec<ProduceRow>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ToSchema)]
 pub struct ProduceRow {
+    /// Field values for this row
     pub values: Vec<serde_json::Value>,
+    /// Change type: "Insert" or "Delete"
     pub change_type: Option<String>,
 }
 
 // === Metadata Management DTOs ===
 
 /// Create database request body
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize, ToSchema)]
 pub struct CreateDatabaseRequest {
+    /// Name of the database to create
     pub database_name: String,
+    /// Optional comment for the database
     pub comment: Option<String>,
+    /// Custom properties for the database
     #[serde(default)]
     pub custom_properties: std::collections::HashMap<String, String>,
+    /// If true, do not fail if the database already exists
     #[serde(default)]
     pub ignore_if_exists: bool,
 }
 
 /// Drop database request body
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ToSchema)]
 pub struct DropDatabaseRequest {
+    /// If true, do not fail if the database does not exist
     #[serde(default)]
     pub ignore_if_not_exists: bool,
+    /// If true, also drop all tables in the database
     #[serde(default)]
     pub cascade: bool,
 }
 
 /// Column specification for table creation
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ToSchema)]
 pub struct ColumnSpec {
+    /// Column name
     pub name: String,
+    /// Data type (e.g., "int", "bigint", "string")
     pub data_type: String,
+    /// Optional column comment
     pub comment: Option<String>,
 }
 
 /// Primary key specification
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ToSchema)]
 pub struct PrimaryKeySpec {
+    /// Optional constraint name
     pub constraint_name: Option<String>,
+    /// Column names that form the primary key
     pub column_names: Vec<String>,
 }
 
 /// Create table request body
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ToSchema)]
 pub struct CreateTableRequest {
+    /// Name of the table to create
     pub table_name: String,
+    /// Column definitions
     pub schema: Vec<ColumnSpec>,
+    /// Primary key definition
     pub primary_key: Option<PrimaryKeySpec>,
+    /// Partition key column names
     pub partition_keys: Option<Vec<String>>,
+    /// Number of buckets
     pub bucket_count: Option<i32>,
+    /// Bucket key column names
     pub bucket_keys: Option<Vec<String>>,
+    /// Table properties
     pub properties: Option<std::collections::HashMap<String, String>>,
+    /// Optional table comment
     pub comment: Option<String>,
+    /// If true, do not fail if the table already exists
     #[serde(default)]
     pub ignore_if_exists: bool,
 }
 
 /// Drop table request body
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ToSchema)]
 pub struct DropTableRequest {
+    /// If true, do not fail if the table does not exist
     #[serde(default)]
     pub ignore_if_not_exists: bool,
 }
 
 /// Offset information for a specific bucket
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, ToSchema)]
 pub struct BucketOffset {
+    /// Bucket ID
     pub bucket_id: i32,
+    /// Offset value
     pub offset: i64,
 }
 
 /// List offsets response
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, ToSchema)]
 pub struct ListOffsetsResponse {
+    /// Table path in format "database/table"
     pub table_path: String,
+    /// Offset specification: "earliest", "latest", or "timestamp"
     pub spec: String,
+    /// List of bucket offsets
     pub offsets: Vec<BucketOffset>,
 }
 
 /// List partitions response
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, ToSchema)]
 pub struct ListPartitionsResponse {
+    /// Table path in format "database/table"
     pub table_path: String,
+    /// List of partition information
     pub partitions: Vec<PartitionInfo>,
 }
 
 /// Partition information
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, ToSchema)]
 pub struct PartitionInfo {
+    /// Partition ID
     pub partition_id: i64,
+    /// Partition name
     pub partition_name: String,
+    /// Partition specification key-value pairs
     pub partition_spec: std::collections::HashMap<String, String>,
 }
 

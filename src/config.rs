@@ -71,7 +71,7 @@ impl Default for AuthConfig {
 
 #[derive(Clone, Debug)]
 pub struct PoolConfig {
-    pub max_connections: u64,
+    pub max_connections: u32,
     pub idle_timeout_secs: u64,
 }
 
@@ -129,7 +129,7 @@ struct FileAuthConfig {
 
 #[derive(Deserialize, Default)]
 struct FilePoolConfig {
-    max_connections: Option<u64>,
+    max_connections: Option<u32>,
     idle_timeout_secs: Option<u64>,
 }
 
