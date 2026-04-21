@@ -5,6 +5,7 @@ use tokio::sync::RwLock;
 
 /// Health status of the gateway
 #[derive(Clone, Debug, PartialEq)]
+#[allow(dead_code)]
 pub enum HealthStatus {
     Healthy,
     Degraded,
@@ -44,6 +45,7 @@ impl CircuitState {
 
 /// Circuit breaker configuration
 #[derive(Clone, Debug)]
+#[allow(dead_code)]
 pub struct CircuitBreakerConfig {
     /// Number of consecutive failures before opening the circuit
     pub failure_threshold: u64,
@@ -61,6 +63,7 @@ impl Default for CircuitBreakerConfig {
 }
 
 /// Circuit breaker for Fluss Coordinator connections
+#[allow(dead_code)]
 pub struct CircuitBreaker {
     state: RwLock<CircuitState>,
     config: CircuitBreakerConfig,
@@ -73,6 +76,7 @@ pub struct CircuitBreaker {
 }
 
 impl CircuitBreaker {
+    #[allow(dead_code)]
     pub fn new(config: CircuitBreakerConfig) -> Self {
         Self {
             state: RwLock::new(CircuitState::new()),
@@ -84,6 +88,7 @@ impl CircuitBreaker {
     }
 
     /// Check if a request is allowed to proceed
+    #[allow(dead_code)]
     pub async fn allow_request(&self) -> bool {
         let state = self.state.read().await;
 
@@ -109,6 +114,7 @@ impl CircuitBreaker {
     }
 
     /// Record a successful operation
+    #[allow(dead_code)]
     pub async fn record_success(&self) {
         let mut state = self.state.write().await;
         state.failures = 0;
@@ -117,6 +123,7 @@ impl CircuitBreaker {
     }
 
     /// Record a failed operation
+    #[allow(dead_code)]
     pub async fn record_failure(&self) {
         let mut state = self.state.write().await;
         state.failures += 1;
@@ -157,6 +164,7 @@ impl CircuitBreaker {
 
 /// Retry configuration
 #[derive(Clone, Debug)]
+#[allow(dead_code)]
 pub struct RetryConfig {
     /// Maximum number of retry attempts
     pub max_retries: u32,
@@ -180,6 +188,7 @@ impl Default for RetryConfig {
 }
 
 /// Execute an operation with retry and circuit breaker logic
+#[allow(dead_code)]
 pub async fn execute_with_retry<T, E, F, Fut>(
     circuit_breaker: &CircuitBreaker,
     retry_config: &RetryConfig,
@@ -254,7 +263,7 @@ mod rand {
     use std::cell::Cell;
 
     thread_local! {
-        static SEED: Cell<u64> = Cell::new(0x1234567890abcdef);
+        static SEED: Cell<u64> = const { Cell::new(0x1234567890abcdef) };
     }
 
     pub fn random<T>() -> T

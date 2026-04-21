@@ -77,11 +77,6 @@ pub fn record_error(error_type: &str) {
     errors_total(error_type);
 }
 
-pub fn record_connection_pool(active: u64, total: u64) {
-    metrics::gauge!("connection_pool_active").set(active as f64);
-    metrics::gauge!("connection_pool_total").set(total as f64);
-}
-
 pub fn normalize_path(uri: &str) -> String {
     let path = uri.split('?').next().unwrap_or(uri);
     let parts: Vec<&str> = path.split('/').collect();

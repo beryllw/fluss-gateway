@@ -44,6 +44,7 @@ pub struct WriteResult {
 #[derive(Debug, Deserialize, ToSchema)]
 pub struct ProduceRequest {
     /// Data format (optional)
+    #[allow(dead_code)]
     pub format: Option<String>,
     /// Rows to write
     pub rows: Vec<ProduceRow>,

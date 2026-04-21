@@ -52,6 +52,7 @@ pub struct GatewayServer {
     backend: Arc<FlussBackend>,
     config: GatewayConfig,
     circuit_breaker: Arc<CircuitBreaker>,
+    #[allow(dead_code)]
     retry_config: RetryConfig,
 }
 
