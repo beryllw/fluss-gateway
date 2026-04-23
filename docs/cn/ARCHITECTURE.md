@@ -28,29 +28,29 @@ FIP-32 提出了一个**多协议查询网关**:基于 `fluss-rust` + DataFusion
 
 ```
 +------------------------------------------------------------------+
-|                        Fluss Gateway (Rust)                       |
-|                                                                   |
-|  +-----------+  +-----------+  +-----------+  +----------------+ |
-|  | Flight SQL|  | PostgreSQL|  |   gRPC    |  |   HTTP REST    | |
-|  |  (只读)    |  |  (只读)    |  | (读写)    |  |  (读写+流式)    | |
-|  +-----+-----+  +-----+-----+  +-----+-----+  +-------+--------+ |
-|        |              |              |                |           |
-|  +-----+--------------+--------------+----------------+--------+ |
-|  |              DataFusion (SQL 查询引擎,只读路径)              | |
-|  +-----+--------------+--------------+----------------+--------+ |
-|        |              |              |                |           |
-|  +-----+--------------+--------------+----------------+--------+ |
-|  |              Service / Controller Layer                       | |
-|  |  AdminService | ProduceService | ConsumeService | Streaming  | |
-|  +-----+--------------+--------------+----------------+--------+ |
-|  |              Middleware Layer                                 | |
-|  |  Auth | RateLimiter | Metrics | AuditLog | EndpointACL      | |
-|  +-----+--------------+--------------+----------------+--------+ |
-|  |              Fluss Backend Layer                              | |
-|  |  FlussBackend trait + ConnectionPool                          | |
-|  +-----+--------------+--------------+----------------+--------+ |
-|        |              |              |                |           |
-+--------+--------------+--------------+----------------+-----------+
+|                       Fluss Gateway (Rust)                        |
+|                                                                    |
+|  +-----------+  +-----------+  +-----------+  +----------------+  |
+|  | Flight SQL|  | PostgreSQL|  |   gRPC    |  |   HTTP REST    |  |
+|  |  (只读)    |  |  (只读)    |  | (读写)    |  |  (读写+流式)    |  |
+|  +-----+-----+  +-----+-----+  +-----+-----+  +-------+--------+  |
+|        |              |              |                |            |
+|  +-----+--------------+--------------+----------------+---------+ |
+|  |              DataFusion (SQL 查询引擎, 只读路径)               | |
+|  +-----+--------------+--------------+----------------+---------+ |
+|        |              |              |                |            |
+|  +-----+--------------+--------------+----------------+---------+ |
+|  |              Service / Controller Layer                        | |
+|  |  AdminService | ProduceService | ConsumeService | Streaming   | |
+|  +-----+--------------+--------------+----------------+---------+ |
+|  |              Middleware Layer                                  | |
+|  |  Auth | RateLimiter | Metrics | AuditLog | EndpointACL        | |
+|  +-----+--------------+--------------+----------------+---------+ |
+|  |              Fluss Backend Layer                               | |
+|  |  FlussBackend trait + ConnectionPool                           | |
+|  +-----+--------------+--------------+----------------+---------+ |
+|        |              |              |                |            |
++--------+--------------+--------------+----------------+------------+
          v              v              v                v
   +-------------+  +-------------+  +-------------+  +-----------+
   | Coordinator |  | TabletServer|  | Schema      |  | Lake      |
@@ -259,7 +259,7 @@ pub trait FlussBackend: Send + Sync {
 
 ## 相关代码库参考
 
-### Fluss (Java) - `/Users/boyu/IdeaProjects/fluss-community/`
+### Fluss (Java)
 
 | 模块 | 关键路径 | 用途 |
 |------|---------|------|
@@ -277,7 +277,7 @@ pub trait FlussBackend: Send + Sync {
 | fluss-client | `fluss-client/src/main/java/.../client/table/scanner.rs` | LogScanner 消费原语 |
 | fluss-client | `fluss-client/src/main/java/.../client/write/` | WriterClient 写入路径 |
 
-### fluss-rust (Rust) - `/Users/boyu/VscodeProjects/fluss-rust/`
+### fluss-rust (Rust)
 
 | 模块 | 关键路径 | 用途 |
 |------|---------|------|
@@ -288,7 +288,7 @@ pub trait FlussBackend: Send + Sync {
 | fluss | `crates/fluss/src/client/table/mod.rs` | FlussTable 入口 |
 | fluss | `crates/fluss/src/client/write/` | WriterClient 写入路径 |
 
-### DataFusion (Rust) - `/Users/boyu/VscodeProjects/datafusion/`
+### DataFusion (Rust)
 
 | 模块 | 关键路径 | 用途 |
 |------|---------|------|

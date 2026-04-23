@@ -19,5 +19,12 @@ Cargo.lock
 *.pdb
 *.dll
 
+# AI assistants
+.claude/
+
+# Documents
+GATEWAY_IMPROVEMENTS.md
+docs/*/PROGRESS.md
+
 # Research notes
 research/
