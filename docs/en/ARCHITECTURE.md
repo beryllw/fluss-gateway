@@ -28,29 +28,29 @@ FIP-32 proposes a **multi-protocol query gateway**: a read-only Rust service bas
 
 ```
 +------------------------------------------------------------------+
-|                        Fluss Gateway (Rust)                       |
-|                                                                   |
-|  +-----------+  +-----------+  +-----------+  +----------------+ |
-|  | Flight SQL|  | PostgreSQL|  |   gRPC    |  |   HTTP REST    | |
-|  |  (read)    |  |  (read)    |  | (r/w)     |  |  (r/w+stream)  | |
-|  +-----+-----+  +-----+-----+  +-----+-----+  +-------+--------+ |
-|        |              |              |                |           |
-|  +-----+--------------+--------------+----------------+--------+ |
-|  |              DataFusion (SQL Query Engine, read path)         | |
-|  +-----+--------------+--------------+----------------+--------+ |
-|        |              |              |                |           |
-|  +-----+--------------+--------------+----------------+--------+ |
-|  |              Service / Controller Layer                       | |
-|  |  AdminService | ProduceService | ConsumeService | Streaming  | |
-|  +-----+--------------+--------------+----------------+--------+ |
-|  |              Middleware Layer                                 | |
-|  |  Auth | RateLimiter | Metrics | AuditLog | EndpointACL      | |
-|  +-----+--------------+--------------+----------------+--------+ |
-|  |              Fluss Backend Layer                              | |
-|  |  FlussBackend trait + ConnectionPool                          | |
-|  +-----+--------------+--------------+----------------+--------+ |
-|        |              |              |                |           |
-+--------+--------------+--------------+----------------+-----------+
+|                       Fluss Gateway (Rust)                        |
+|                                                                    |
+|  +-----------+  +-----------+  +-----------+  +----------------+  |
+|  | Flight SQL|  | PostgreSQL|  |   gRPC    |  |   HTTP REST    |  |
+|  |  (read)    |  |  (read)    |  | (r/w)     |  |  (r/w+stream)  |  |
+|  +-----+-----+  +-----+-----+  +-----+-----+  +-------+--------+  |
+|        |              |              |                |            |
+|  +-----+--------------+--------------+----------------+---------+ |
+|  |              DataFusion (SQL Query Engine, read path)          | |
+|  +-----+--------------+--------------+----------------+---------+ |
+|        |              |              |                |            |
+|  +-----+--------------+--------------+----------------+---------+ |
+|  |              Service / Controller Layer                        | |
+|  |  AdminService | ProduceService | ConsumeService | Streaming   | |
+|  +-----+--------------+--------------+----------------+---------+ |
+|  |              Middleware Layer                                  | |
+|  |  Auth | RateLimiter | Metrics | AuditLog | EndpointACL        | |
+|  +-----+--------------+--------------+----------------+---------+ |
+|  |              Fluss Backend Layer                               | |
+|  |  FlussBackend trait + ConnectionPool                           | |
+|  +-----+--------------+--------------+----------------+---------+ |
+|        |              |              |                |            |
++--------+--------------+--------------+----------------+------------+
          v              v              v                v
   +-------------+  +-------------+  +-------------+  +-----------+
   | Coordinator |  | TabletServer|  | Schema      |  | Lake      |
@@ -259,7 +259,7 @@ Follows `HTTP Status Code + 2-digit suffix` pattern:
 
 ## Related Codebase References
 
-### Fluss (Java) - `/Users/boyu/IdeaProjects/fluss-community/`
+### Fluss (Java)
 
 | Module | Key Path | Purpose |
 |--------|----------|---------|
@@ -277,7 +277,7 @@ Follows `HTTP Status Code + 2-digit suffix` pattern:
 | fluss-client | `fluss-client/src/main/java/.../client/table/scanner.rs` | LogScanner consumption primitives |
 | fluss-client | `fluss-client/src/main/java/.../client/write/` | WriterClient write path |
 
-### fluss-rust (Rust) - `/Users/boyu/VscodeProjects/fluss-rust/`
+### fluss-rust (Rust)
 
 | Module | Key Path | Purpose |
 |--------|----------|---------|
@@ -288,7 +288,7 @@ Follows `HTTP Status Code + 2-digit suffix` pattern:
 | fluss | `crates/fluss/src/client/table/mod.rs` | FlussTable entry |
 | fluss | `crates/fluss/src/client/write/` | WriterClient write path |
 
-### DataFusion (Rust) - `/Users/boyu/VscodeProjects/datafusion/`
+### DataFusion (Rust)
 
 | Module | Key Path | Purpose |
 |--------|----------|---------|
