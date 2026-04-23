@@ -147,6 +147,12 @@ cargo test --test integration
 
 完整部署指南：[English](../en/DEPLOY.md) | [Chinese](./DEPLOY.md)
 
+## 版本发布
+
+项目采用语义化版本（SemVer），使用 `cargo-release` 一条命令完成版本发布。
+
+发布指南：[English](../en/RELEASE.md) | [Chinese](./RELEASE.md)
+
 ## License
 
 Apache License 2.0
