@@ -1,0 +1,26 @@
+# cargo-release configuration
+# Usage:
+#   cargo release patch  (0.1.0 -> 0.1.1)
+#   cargo release minor  (0.1.0 -> 0.2.0)
+#   cargo release major  (0.1.0 -> 1.0.0)
+#   cargo release 0.3.0  (explicit version)
+#
+# Dry run (default): cargo release minor
+# Actually release:   cargo release minor --execute
+
+# Create and push a git tag with "v" prefix (e.g., v0.2.0)
+tag-prefix = "v"
+tag-name = "{{prefix}}{{version}}"
+
+# Commit message for the version bump
+pre-release-commit-message = "chore: release v{{version}}"
+
+# Push to remote after tagging
+push = true
+
+# Do not publish to crates.io (this is a binary, not a library)
+publish = false
+
+# Sign tags if GPG is configured (optional, set to true if needed)
+sign-tag = false
+sign-commit = false

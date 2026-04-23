@@ -109,7 +109,7 @@ impl ServeArgs {
 }
 
 #[derive(Debug, Parser)]
-#[command(name = "fluss-gateway")]
+#[command(name = "fluss-gateway", version)]
 #[command(about = "REST API Gateway for Apache Fluss")]
 struct Cli {
     #[command(subcommand)]

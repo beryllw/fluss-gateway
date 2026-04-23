@@ -147,6 +147,12 @@ cargo test --test integration
 
 Full deployment guide: [English](docs/en/DEPLOY.md) | [Chinese](docs/cn/DEPLOY.md)
 
+## Releasing
+
+The project follows Semantic Versioning (SemVer) and uses `cargo-release` for one-command releases.
+
+Release guide: [English](docs/en/RELEASE.md) | [Chinese](docs/cn/RELEASE.md)
+
 ## License
 
 Apache License 2.0

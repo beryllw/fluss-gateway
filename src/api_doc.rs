@@ -15,7 +15,7 @@ use utoipa::{Modify, OpenApi};
         title = "Fluss Gateway API",
         description = "REST API Gateway for Apache Fluss - provides HTTP access to Fluss tables for data operations and metadata management",
         contact(name = "Fluss Gateway", url = "https://github.com/boyu/fluss-gateway"),
-        version = "0.1.0"
+        version = env!("CARGO_PKG_VERSION")
     ),
     paths(
         crate::server::rest::health,
